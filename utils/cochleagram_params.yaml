@@ -1,0 +1,22 @@
+frontend:
+  feature_type: cochlear
+  cochlear:
+    filter_params:
+      sr: 44100
+      env_sr: 8000
+      n_channels: 40
+      low_lim: 40
+    use_pad: True
+    use_fir: True
+    env_extraction_type: 'Half-wave Rectification'
+    downsampling_type: 'TorchTransformsResample'
+    downsampling_params:
+      lowpass_filter_width: 64
+      rolloff: 0.9475937167399596
+      resampling_method: "sinc_interp_kaiser"
+      beta: 14.769656459379492
+    compression_kwargs:
+      scale: 1
+      offset: 0.0000001   
+      clip_value: 5
+      power: 0.3
