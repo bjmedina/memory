@@ -5,6 +5,15 @@ from scipy import signal
 import numpy as np
 import glob
 
+sys.path.append('/om2/user/bjmedina/')
+
+from chexture_choolbox.auditorytexture.statistics_sets import (
+    STAT_SET_FULL_MCDERMOTTSIMONCELLI as statistics_dict
+)
+from chexture_choolbox.auditorytexture.texture_model import TextureModel
+from chexture_choolbox.auditorytexture.helpers import FlattenStats
+from texture_prior.params import model_params
+
 class AudioTextureEncoder(nn.Module):
     def __init__(self, statistics_dict, model_params, sr=20000, rms_level=0.04, duration=2.0, device='cuda'):
         super().__init__()
