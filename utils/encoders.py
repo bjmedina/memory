@@ -4,6 +4,7 @@ from scipy.io import wavfile
 from scipy import signal
 import numpy as np
 import glob
+import sys
 
 sys.path.append('/om2/user/bjmedina/')
 
@@ -14,8 +15,11 @@ from chexture_choolbox.auditorytexture.texture_model import TextureModel
 from chexture_choolbox.auditorytexture.helpers import FlattenStats
 from texture_prior.params import model_params
 
+from sklearn.decomposition import PCA
+
+
 class AudioTextureEncoder(nn.Module):
-    def __init__(self, statistics_dict, model_params, sr=20000, rms_level=0.04, duration=2.0, device='cuda'):
+    def __init__(self, statistics_dict, model_params, sr=20000, rms_level=0.05, duration=2.0, device='cuda'):
         super().__init__()
         self.sr = sr
         self.rms_level = rms_level
@@ -157,8 +161,10 @@ class ZScoreSpace(nn.Module):
         z = (rep - self.mean) / (self.std + self.eps)
         return torch.tensor(z, dtype=torch.float32).to(self.device)
 
-sounds_list = glob.glob("/mindhive/mcdermott/www/mturk_stimuli/bjmedina/mem_exp_atexts_p1/*wav")
-texture_list = sounds_list
-print(sounds_list)
 
-ALL_SOUNDS = glob.glob("/om2/data/public/audioset/wavs/unbalanced_train_segments_downloads/unbalanced_train_segments_downloads_*/*wav")
+if __name__ == "__main__":
+    sounds_list = glob.glob("/mindhive/mcdermott/www/mturk_stimuli/bjmedina/mem_exp_atexts_p1/*wav")
+    texture_list = sounds_list
+    print(sounds_list)
+    
+    ALL_SOUNDS = glob.glob("/om2/data/public/audioset/wavs/unbalanced_train_segments_downloads/unbalanced_train_segments_downloads_*/*wav")

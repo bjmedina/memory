@@ -6,10 +6,18 @@ import torchaudio
 
 from scipy.signal import hilbert
 
+import soundfile as sf
+from scipy.io import wavfile
+
 def rms_normalize(signal, target_rms=0.1):
     """Normalize signal to a target RMS value."""
     rms = np.sqrt(np.mean(signal**2))
     return signal * (target_rms / rms) if rms > 0 else signal
+
+def compute_rms(signal):
+    """Compute the Root Mean Square (RMS) of a signal."""
+    signal = np.array(signal, dtype=np.float32)
+    return np.sqrt(np.mean(signal ** 2))
 
     
 def compute_silence_duration(sound, sr, threshold=0.01):
@@ -169,3 +177,43 @@ def should_filter_out_yin_cpu(data_np, sr,
     is_pure = (periodicity_score > threshold) and (stability_std < std_thresh)
 
     return is_pure, periodicity_score, stability_std
+
+def process_clip(file_path, output_path, start=0.0, end=2.0, factor=0.05):
+    """
+    Extract a normalized segment from a WAV file and save it.
+
+    Parameters:
+        file_path (str): Path to the original audio file.
+        output_path (str): Where to save the processed clip.
+        start (float): Start time in seconds.
+        end (float): End time in seconds.
+        factor (float): Target RMS level.
+    """
+    # Read the full WAV file
+    sample_rate, data = wavfile.read(file_path)
+    
+    # Ensure it's float32
+    data = np.array(data, dtype=np.float32)
+
+    # Check if mono or stereo; convert stereo to mono if needed
+    if len(data.shape) > 1:
+        data = np.mean(data, axis=1)
+
+    # Convert times to sample indices
+    start_sample = int(start * sample_rate)
+    end_sample = int(end * sample_rate)
+
+    if end_sample > len(data):
+        raise ValueError(f"Clip range [{start}, {end}] exceeds audio length.")
+
+    # Trim
+    clip = data[start_sample:end_sample]
+
+    # Normalize
+    rms = compute_rms(clip)
+    if rms > 0:
+        clip = clip * (factor / rms)
+
+    # Save to output path
+    sf.write(output_path, clip, sample_rate)
+
