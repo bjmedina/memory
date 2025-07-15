@@ -1,7 +1,13 @@
+import json
+import os
 import random
+import re
+
 import numpy as np
-from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
+
+
+from collections import defaultdict, Counter
 
 from IPython.display import clear_output
 
@@ -501,25 +507,234 @@ class ISISequence:
         else:
             print("✅ No duplicate sequences.")
 
+class ISISequenceBolivia(ISISequence):
+    def __init__(self, length=252, isi_counts={0: 20, 16: 22}, seed=15):
+        assert sum(isi_counts.values()) * 2 <= length, "Total repeat trials exceed sequence length"
+        super().__init__(length=length, isi_values=list(isi_counts.keys()), seed=seed)
+        self.isi_counts = isi_counts
+
+    def generate_one(self, target_repetition_rate=0.5, min_pairs_per_isi=0):
+        def find_upgradeable_pairs(seq, isi):
+            return [(i, i + isi + 1)
+                    for i in range(len(seq) - isi - 1)
+                    if seq[i] == -1 and seq[i + isi + 1] == -1]
+
+        isi_key = [-1] * self.length
+        pairs_by_isi = defaultdict(list)
+        self._rng.shuffle(self.isi_values)
+
+        for isi in self.isi_values:
+            target_pairs = self.isi_counts[isi]
+            attempts = 0
+            while len(pairs_by_isi[isi]) < target_pairs:
+                upgrade_candidates = find_upgradeable_pairs(isi_key, isi)
+                self._rng.shuffle(upgrade_candidates)
+                if not upgrade_candidates:
+                    raise ValueError(f"⚠️ Could not place {target_pairs} pairs for ISI={isi} (only placed {len(pairs_by_isi[isi])})")
+                i1, i2 = upgrade_candidates.pop()
+                isi_key[i1] = isi
+                isi_key[i2] = isi
+                pairs_by_isi[isi].append((i1, i2))
+                attempts += 1
+                if attempts > 1000:
+                    raise RuntimeError("Too many attempts to insert repeat pairs. Try increasing sequence length.")
+
+        # Fill leftover -1s with -1 again to make explicit non-repeats
+        nonrepeats = sum(1 for x in isi_key if x == -1)
+        rep_pairs = sum(len(pairs_by_isi[isi]) for isi in self.isi_counts)
+        nonrepeats = self.length - 2 * rep_pairs
+        
+        rep_rate = rep_pairs / (rep_pairs + nonrepeats)
+        if abs(rep_rate - target_repetition_rate) > 0.01:
+            raise ValueError(f"Actual repetition rate {rep_rate:.3f} differs from target {target_repetition_rate:.3f}")
+
+        # Store and return
+        seq_tuple = tuple(isi_key)
+        if seq_tuple not in self._seen_sequences:
+            self._seen_sequences.add(seq_tuple)
+            self.sequences.append(isi_key)
+
+            for key in pairs_by_isi:
+                pairs_by_isi[key] = sorted(pairs_by_isi[key])
+
+            for idx, val in enumerate(isi_key):
+                if val == -1:
+                    pairs_by_isi[val].append(idx)
+
+            pairs_by_isi = {k: pairs_by_isi[k] for k in sorted(pairs_by_isi)}
+            self.pairs.append(pairs_by_isi)
+
+        return isi_key, pairs_by_isi
+
+    def plot_summary(self, title="ISI Distribution Across Sequences (n={}, seq. length={})"):
+        """Plot a bar chart of ISI usage across all stored sequences."""
+        summary = self.summary_across()
+    
+        # Separate ISI values and counts
+        isi_vals = sorted(summary.keys())
+        counts = [summary[isi] for isi in isi_vals]
+    
+        # Plot
+        plt.figure(figsize=(8, 5))
+        plt.bar([str(isi) for isi in isi_vals], counts, alpha=0.5)
+        plt.xlabel("ISI Value")
+        plt.ylabel("Number of Trials")
+        plt.title(title.format(len(self.sequences), self.length))
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_avg_isi_across_sequences(self):
+        """Plot the average ISI value (excluding -1s) across all stored sequences."""
+        import matplotlib.pyplot as plt
+        import numpy as np
+    
+        avg_isis = [
+            np.mean([isi for isi in seq if isi >= 0]) if any(isi >= 0 for isi in seq) else 0
+            for seq in self.sequences
+        ]
+
+        valid_isi_values = [isi for isi in self.isi_values if isi >= 0]
+        empirical_avg = np.mean(avg_isis)
+        total_pairs = sum(self.isi_counts.values())
+        theoretical_avg = sum(isi * count for isi, count in self.isi_counts.items()) / total_pairs        
+        plt.figure(figsize=(6, 4))
+        plt.plot(avg_isis, marker='o', alpha=0.5)
+        plt.axhline(y=theoretical_avg, color='red', linestyle='--', label=f'Theoretical Avg = {theoretical_avg:.2f}')
+        plt.axhline(y=empirical_avg, color='m', linestyle='--', label=f'Empirical Avg = {empirical_avg:.2f}')        
+        plt.xlabel("Sequence Index")
+        plt.ylabel("Average ISI (excluding -1)")
+        plt.title("Avg. ISI per Sequence")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+    def plot_isi_position_bias(self, bins=4):
+        """
+        Visualize ISI distributions across positions in the sequence to detect ISI-specific biases.
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from collections import defaultdict
+    
+        sequence_length = len(self.sequences[0])
+        bin_edges = np.linspace(0, sequence_length, bins + 1, dtype=int)
+        isi_labels = sorted({isi for seq in self.sequences for isi in seq if isi >= 0})
+    
+        counts = {isi: np.zeros(bins) for isi in isi_labels}
+    
+        for seq in self.sequences:
+            for b in range(bins):
+                start, end = bin_edges[b], bin_edges[b + 1]
+                for i in range(start, end):
+                    isi = seq[i]
+                    if isi >= 0:
+                        counts[isi][b] += 1
+    
+        # Normalize to get proportions
+        totals = np.sum(list(counts.values()), axis=0)
+        proportions = {isi: counts[isi] / (totals + 1e-9) for isi in isi_labels}
+    
+        # Plot
+        plt.figure(figsize=(8, 5))
+        for isi in isi_labels:
+            plt.plot(range(bins), proportions[isi], marker='o', label=f"ISI {isi}")
+    
+        # Add ideal reference line
+        ideal_proportion = 1 / len(isi_labels)
+        plt.axhline(ideal_proportion, color='gray', linestyle='--', alpha=0.7, label=f"Ideal = {ideal_proportion:.3f}")
+    
+        plt.xlabel("Sequence Bin (Position)")
+        plt.ylabel("Proportion of ISI Trials")
+        plt.title("Distribution of ISI Conditions Across Sequence Positions")
+        plt.xticks(range(bins), [f"Bin {i+1}" for i in range(bins)])
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_isi_position_bias(self, bins=4):
+        """
+        Visualize ISI distributions across positions in the sequence to detect ISI-specific biases.
+        Uses target proportions based on self.isi_counts instead of equal distribution.
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from collections import defaultdict
+    
+        if not self.sequences:
+            raise ValueError("No sequences available to analyze.")
+    
+        sequence_length = len(self.sequences[0])
+        bin_edges = np.linspace(0, sequence_length, bins + 1, dtype=int)
+        isi_labels = sorted({isi for seq in self.sequences for isi in seq if isi >= 0})
+    
+        counts = {isi: np.zeros(bins) for isi in isi_labels}
+    
+        for seq in self.sequences:
+            for b in range(bins):
+                start, end = bin_edges[b], bin_edges[b + 1]
+                for i in range(start, end):
+                    isi = seq[i]
+                    if isi >= 0:
+                        counts[isi][b] += 1
+    
+        # Normalize by total counts per bin
+        totals = np.sum(list(counts.values()), axis=0)
+        proportions = {isi: counts[isi] / (totals + 1e-9) for isi in isi_labels}
+    
+        # Compute ideal proportions from self.isi_counts
+        total_pairs = sum(self.isi_counts.values())
+        ideal_props = {isi: self.isi_counts[isi] / total_pairs for isi in self.isi_counts}
+    
+        # Plot
+        plt.figure(figsize=(8, 5))
+        for isi in isi_labels:
+            plt.plot(range(bins), proportions[isi], marker='o', label=f"ISI {isi} (ideal: {ideal_props[isi]:.2f})")
+    
+        # Add individual ideal reference lines
+        for isi in isi_labels:
+            plt.axhline(ideal_props[isi], linestyle='--', alpha=0.5, label=f"Ideal ISI {isi}")
+    
+        plt.xlabel("Sequence Bin (Position)")
+        plt.ylabel("Proportion of ISI Trials")
+        plt.title("Distribution of ISI Conditions Across Sequence Positions")
+        plt.xticks(range(bins), [f"Bin {i+1}" for i in range(bins)])
+        plt.ylim(0, 1)
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
 
 class StimulusManager:
-    def __init__(self, stimulus_ids, isi_values, length=258, seed=5):
+    def __init__(self, stimulus_ids, isi_values, length=258, seed=5, stimulus_rotation_step=None, shuffle=True):
         self._rng = random.Random(seed)
         self.stimulus_ids = list(stimulus_ids)
-        self._rng.shuffle(self.stimulus_ids)
+
+        self.stimulus_ids = self.stimulus_ids[:length//3*2]
+        if shuffle:
+            self._rng.shuffle(self.stimulus_ids)
         self.n = length
         self.isi_values = sorted(isi_values)
         self.seq_index = 0
         self.assignment_log = []
         self.debug = False
-        self.stimulus_rotation_step = self.n // (3 * (len(self.isi_values) - 1))  # exclude -1
+        if stimulus_rotation_step is None:
+            self.stimulus_rotation_step = self.n // (3 * (len(self.isi_values) - 1))  # exclude -1
+        else:
+            self.stimulus_rotation_step = stimulus_rotation_step
         self.stimulus_offset = 0
+        self.assignments = []
+        self.seqs = []
+        self.seed = seed
 
     def toggle_debug(self):
         self.debug = not self.debug
         print(f"Debug switch now turned {self.debug}!")
 
-    def get_assignments_from_pairs(self, pairs_by_isi):
+    def get_assignments_from_pairs(self, pairs_by_isi, seq=None):
         """
         Assign stimuli deterministically to ISI conditions using rotation and pair counts.
         """
@@ -539,6 +754,8 @@ class StimulusManager:
             if self.debug:
                 print(isi, entries)
                 print("\n")
+
+            self._rng.shuffle(entries)
             
             for item in entries:
                 stim = rolled[pointer]
@@ -548,7 +765,7 @@ class StimulusManager:
                     i1, i2 = item
                     assignments[i1] = stim
                     assignments[i2] = stim
-                    assignment_log[stim] = {'isi': isi, 'type': 'repeat'}
+                    assignment_log[stim] = {'isi': isi, 'type': 'repeat', 'pos': i2}
                 else:  # Non-repeat trial (just one index)
                     i = item
                     assignments[i] = stim
@@ -560,8 +777,105 @@ class StimulusManager:
         assignment_log = dict(sorted(assignment_log.items()))
 
         self.assignment_log.append(assignment_log)
+        self.assignments.append(assignments)
+        self.seqs.append(seq)
         self.seq_index += 1
         return assignments
+    
+    def save_current_assignments(self, isi_key, repetition_rate, getAnswerKey=None):
+        """
+        Save the current assignment info from the last sequence generation.
+        - seq: The output of get_assignments_from_pairs()
+        - isi_key: List of ISIs for each position (len = self.n)
+        - repetition_rate: Float indicating how many repeats per total
+        - getAnswerKey: Optional function to get answer key from sequence
+        """
+    
+        last_log = self.assignment_log[-1]
+    
+        # Map stimulus index to filename
+        stim_id_to_filename = {i: stim for i, stim in enumerate(self.stimulus_ids)}
+    
+        # Reconstruct filenames for current sequence
+        seq_filenames = [stim_id_to_filename[s] if s in stim_id_to_filename else None for s in seq]
+    
+        # YouTube IDs, assuming filenames contain them
+        yt_ids = [f.split("_")[-1].replace(".wav", "") if f else None for f in seq_filenames]
+    
+        data = {
+            "repetition_rate": repetition_rate,
+            "order": seq,
+            "filenames_order": seq_filenames,
+            "yt_id": yt_ids,
+            "isi": isi_key,
+            "key": getAnswerKey(seq) if getAnswerKey else None,
+        }
+    
+        return data
+
+    def save_sequence_to_json(self, assignments, seq, index, tol, base_path, sound_types_json, prefix="exemplar"):
+        filenames_order = assignments
+        isi = seq
+        key = self._compute_answer_key(filenames_order)
+    
+        isi_counts = dict(Counter(isi))
+        isi_counts_str_keys = {str(k): v for k, v in isi_counts.items()}
+    
+        def count_nonrepeats(isi_key):
+            return sum(1 for x in isi_key if x == -1)
+    
+        def count_repeats(isi_key):
+            return sum(1 for x in isi_key if x >= 0) // 2
+    
+        def current_repetition_rate(num_repeats, num_nonrepeats):
+            return num_repeats / (num_repeats + num_nonrepeats)
+    
+        repetition_rate = current_repetition_rate(count_repeats(isi), count_nonrepeats(isi))
+    
+        # Create mapping from stim_path to type
+        path_to_type = {entry['stim_path']: entry['type'] for entry in sound_types_json}
+    
+        # Extract types for each assigned stimulus
+        types_order = [path_to_type.get(stim_path, 'unknown') for stim_path in filenames_order]
+    
+        data = {
+            **isi_counts_str_keys,
+            "repetition_rate": repetition_rate,
+            "order": [int(re.search(r"mem_stim_(\d+).wav", s).group(1)) for s in filenames_order],
+            "filenames_order": [f.split("/")[-1] for f in filenames_order],
+            "types_order": types_order,  # NEW: list of types corresponding to filenames_order
+            "isi": isi,
+            "key": key
+        }
+    
+        out_path = self._generate_filename(index=index, length=self.n, tol=tol, seed=self.seed,  base_path=base_path, prefix=prefix)
+    
+        with open(out_path, "w") as f:
+            json.dump(data, f, indent=2)
+    
+        print(f"Saved sequence to: {out_path}")
+        return out_path
+
+    def _generate_filename(self, index, length, tol, seed, base_path, prefix=""):
+        isi_str = self._isi_string()
+        fname = f"{prefix}seq{index:03}_len{length}_s{seed}_{isi_str}.json"
+        return os.path.join(base_path, fname)
+
+    def _compute_answer_key(self, filenames_order):
+        seen = set()
+        key = []
+        for stim in filenames_order:
+            if stim in seen:
+                key.append(1)
+            else:
+                key.append(0)
+                seen.add(stim)
+        return key
+
+    def _isi_string(self):
+        isi_str = "isi" + "_".join(f"{isi:.1f}".replace(".", "p") for isi in sorted(self.isi_values))
+        return isi_str
+
 
     def check_isi_rotation(self):
         if len(self.assignment_log) < 2:
@@ -625,10 +939,311 @@ class StimulusManager:
         plt.ylabel("Assigned ISI")
         plt.title("ISI Assignment History per Stimulus")
         plt.yticks(sorted(self.isi_values))
-        plt.xticks(range(len(self.assignment_log)))  # Force integer ticks
+        plt.xticks(range(len(self.assignment_log)), rotation=-50)  # Force integer ticks
         plt.grid(True, linestyle='--', alpha=0.5)
         
         if max_stimuli <= 10:
             plt.legend(title="Stimulus ID", bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.tight_layout()
         plt.show()
+
+    def check_unique_stimuli_per_isi(self, plot=True):
+        """
+        Count how many unique stimuli were assigned to each ISI across all sequences.
+        
+        Args:
+            plot (bool): Whether to show a bar plot of results.
+        
+        Returns:
+            dict: ISI → number of unique stimuli
+        """
+        isi_to_stims = defaultdict(set)
+
+        for seq_log in self.assignment_log:
+            for stim, info in seq_log.items():
+                isi = info['isi']
+                isi_to_stims[isi].add(stim)
+
+        isi_counts = {isi: len(stims) for isi, stims in isi_to_stims.items()}
+
+        if plot:
+            plt.figure(figsize=(6, 4))
+            plt.bar([str(isi) for isi in sorted(isi_counts)], 
+                    [isi_counts[isi] for isi in sorted(isi_counts)])
+            plt.xlabel("ISI Value")
+            plt.ylabel("Number of Unique Stimuli Assigned")
+            plt.title("Unique Stimuli per ISI Across All Sequences")
+            plt.grid(axis='y', linestyle='--', alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+        return isi_counts
+
+    def plot_stimulus_isi_usage(self, max_stimuli=50):
+        """
+        Plot how many times each stimulus has been assigned to each *non-repeat* ISI.
+        
+        Args:
+            max_stimuli (int): Max number of stimuli to display in the heatmap.
+        """
+        import pandas as pd
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from collections import defaultdict
+    
+        stim_isi_counts = defaultdict(lambda: defaultdict(int))
+    
+        # Count stimulus usage by ISI (excluding -1)
+        for log in self.assignment_log:
+            for stim, entry in log.items():
+                isi = entry['isi']
+                if isi == -1:
+                    continue
+                stim_isi_counts[stim][isi] += 1
+    
+        # Create DataFrame
+        df = pd.DataFrame(stim_isi_counts).fillna(0).astype(int).T
+        df = df.sort_index().iloc[:max_stimuli]  # limit rows
+    
+        # Sort ISI columns numerically
+        df = df[sorted(df.columns)]
+    
+        # Plot
+        plt.figure(figsize=(10, 6))
+        sns.heatmap(df, annot=True, fmt='d', cmap="YlGnBu", 
+                    cbar_kws={'label': 'Usage Count'}, xticklabels=True, yticklabels=True)
+        plt.xlabel("ISI (excluding -1)")
+        plt.ylabel("Stimulus")
+        plt.title("Stimulus × ISI Usage Frequency")
+        plt.xticks(rotation=0)
+        #plt.yticks(rotation=0)
+        plt.yticks([], [])
+        plt.tight_layout()
+        plt.show()
+
+    def check_stimulus_position_distribution(self, plot=True):
+        """
+        Analyze the average position of each stimulus across all sequences.
+        
+        Args:
+            plot (bool): Whether to display the position histogram.
+        
+        Returns:
+            dict: stimulus → list of trial indices it appeared in
+        """
+        from collections import defaultdict
+        import numpy as np
+        import matplotlib.pyplot as plt
+    
+        stim_positions = defaultdict(list)
+    
+        # Reconstruct positions from assignment logs
+        for seq_idx, log in enumerate(self.assignment_log):
+            for i in range(self.n):  # positions in the sequence
+                for stim, entry in log.items():
+                    if entry['type'] == 'repeat':
+                    #if entry.get('index') == i:  # optional if you've stored index
+                        stim_positions[stim].append(entry['pos'])
+    
+        # Or, if you're reconstructing from assignments directly:
+        # for seq_idx, assignments in enumerate(self.assignments):  # if stored
+        #     for i, stim in enumerate(assignments):
+        #         stim_positions[stim].append(i)
+    
+        # Compute average position for each stimulus
+        stim_avg_position = {stim: np.mean(positions) for stim, positions in stim_positions.items()}
+    
+        if plot:
+            plt.figure(figsize=(6, 4))
+            plt.hist(stim_avg_position.values(), bins=self.n, color='orange', edgecolor='black')
+            plt.axvline(self.n / 2, color='red', linestyle='--', label='Sequence Midpoint')
+            plt.xlabel("Average Sequence Position")
+            plt.ylabel("Number of Stimuli")
+            plt.title("Stimulus Position Distribution Across Sequences")
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+    
+        return stim_avg_position
+
+
+    def plot_sound_type_counts_for_positive_isi(self, sound_types_json):
+        """
+        Plot a bar chart showing how many times each sound type was assigned
+        to the *positive non-zero ISI* (e.g., ISI=16) across all assignment logs.
+    
+        Args:
+            sound_types_json (list): List of dictionaries mapping stim_path to 'type'.
+        """
+        import matplotlib.pyplot as plt
+        from collections import defaultdict
+    
+        # Step 1: Map stim_path → type
+        path_to_type = {entry['stim_path']: entry['type'] for entry in sound_types_json}
+    
+        # Step 2: Find positive non-zero ISI (e.g., 16)
+        valid_isi_values = [isi for isi in self.isi_values if isi > 0]
+        if not valid_isi_values:
+            raise ValueError("No positive non-zero ISI value found.")
+        target_isi = valid_isi_values[0]  # assume only one such ISI (as in Bolivia case)
+    
+        # Step 3: Count sound types for that ISI
+        type_counts = defaultdict(int)
+        for log in self.assignment_log:
+            for stim_path, info in log.items():
+                if info.get('isi') == target_isi:
+                    stype = path_to_type.get(stim_path, 'unknown')
+                    type_counts[stype] += 1
+    
+        # Step 4: Plot
+        plt.figure(figsize=(6, 4))
+        types = sorted(type_counts.keys())
+        counts = [type_counts[t] for t in types]
+        print(counts)
+    
+        plt.bar(types, counts, color='skyblue', edgecolor='black')
+        plt.xlabel("Sound Type")
+        plt.ylabel("Frequency (ISI = {})".format(target_isi))
+        plt.title(f"Sound Type Frequency at ISI = {target_isi}. Num. Seqs. = {len(self.assignment_log)}")
+        plt.grid(axis='y', linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_stimulus_usage_for_positive_isi(self):
+        """
+        Plot how many times each stimulus was assigned to the positive non-zero ISI
+        (e.g., ISI = 16), across all assignment logs.
+        """
+        import matplotlib.pyplot as plt
+        from collections import defaultdict
+    
+        # Step 1: Identify the target ISI
+        valid_isi_values = [isi for isi in self.isi_values if isi > 0]
+        if not valid_isi_values:
+            raise ValueError("No positive ISI found.")
+        target_isi = valid_isi_values[0]
+    
+        # Step 2: Count stimulus assignments at that ISI
+        stim_counts = defaultdict(int)
+    
+        for log in self.assignment_log:
+            for stim, info in log.items():
+                if info.get('isi') == target_isi:
+                    stim_counts[stim] += 1
+    
+        # Step 3: Sort and plot
+        stim_ids = sorted(stim_counts, key=lambda k: int(''.join(filter(str.isdigit, k))))
+        counts = [stim_counts[s] for s in stim_ids]
+
+        condensed_stim_ids = [ s.split("/")[-1].split("_")[-1].split(".")[0] for s in stim_ids]
+    
+        plt.figure(figsize=(10, 4))
+        plt.bar(condensed_stim_ids, counts, color='teal', edgecolor='black')
+        plt.xticks(rotation=90, fontsize=6)
+        plt.xlabel("Stimulus ID")
+        plt.ylabel(f"# of ISI={target_isi} Assignments")
+        plt.title(f"Stimulus Usage at ISI = {target_isi} (N={len(self.assignment_log)} sequences)")
+        plt.grid(axis='y', linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_repeats_by_type_per_sequence(self, sound_types_json):
+        import matplotlib.pyplot as plt
+        from collections import defaultdict
+    
+        # Map stim_path to type
+        path_to_type = {entry['stim_path']: entry['type'] for entry in sound_types_json}
+    
+        # Collect data: sequence index → type → count
+        seq_type_counts = defaultdict(lambda: defaultdict(int))
+    
+        for seq_idx, log in enumerate(self.assignment_log):
+            for stim_path, info in log.items():
+                if info.get('type') == 'repeat' and info.get('isi', -1) >= 0:
+                    stype = path_to_type.get(stim_path, 'unknown')
+                    seq_type_counts[seq_idx][stype] += 1
+    
+        # Extract all types and prepare data
+        all_types = sorted({stype for counts in seq_type_counts.values() for stype in counts})
+        seq_indices = sorted(seq_type_counts.keys())
+        heights = {stype: [seq_type_counts[i].get(stype, 0) for i in seq_indices] for stype in all_types}
+    
+        # Plot
+        plt.figure(figsize=(10, 5))
+        bottom = [0] * len(seq_indices)
+        for stype in all_types:
+            plt.bar(seq_indices, heights[stype], bottom=bottom, label=stype)
+            bottom = [sum(x) for x in zip(bottom, heights[stype])]
+    
+        plt.xlabel("Sequence Index")
+        plt.ylabel("Repeat Trials per Type")
+        plt.title("Repeat Trial Count per Sound Type (per Sequence)")
+        plt.legend(title="Sound Type")
+        plt.grid(True, axis='y', linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_average_repeat_position_per_stimulus(self):
+        """
+        Plot the average sequence position of repeat trials (second occurrence) for each stimulus.
+        Useful for detecting positional bias in how repeats are placed.
+        """
+        import matplotlib.pyplot as plt
+        from collections import defaultdict
+        import numpy as np
+    
+        stim_positions = defaultdict(list)
+    
+        # Gather all repeat positions
+        for log in self.assignment_log:
+            for stim, info in log.items():
+                if info['type'] == 'repeat' and 'pos' in info:
+                    stim_positions[stim].append(info['pos'])
+    
+        if not stim_positions:
+            print("No repeat position data found.")
+            return
+    
+        # Compute average position per stimulus
+        stim_avg_pos = {stim: np.mean(positions) for stim, positions in stim_positions.items()}
+        sorted_stims = sorted(stim_avg_pos, key=lambda s: int(''.join(filter(str.isdigit, s))))  # sort by stim number
+        avg_positions = [stim_avg_pos[s] for s in sorted_stims]
+
+        condensed_stim_ids = [ s.split("/")[-1].split("_")[-1].split(".")[0] for s in sorted_stims]
+
+    
+        # Plot
+        plt.figure(figsize=(10, 4))
+        plt.bar(condensed_stim_ids, avg_positions, color='slateblue', edgecolor='black')
+        plt.axhline(self.n / 2, linestyle='--', color='red', label="Midpoint")
+        plt.xticks(rotation=90, fontsize=6)
+        plt.xlabel("Stimulus")
+        plt.ylabel("Average Position of Repeat (2nd instance)")
+        plt.title("Average Repeat Position per Stimulus")
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+def save_all_sequences(manager, tol, base_path, sound_types_json="", prefix="texture_vs_exemplar"):
+    """
+    Save all assignment/sequence pairs stored in the manager using its own save_sequence_to_json method.
+    
+    Args:
+        manager: StimulusManagerTextureVsExemplar instance
+        tol: The tolerance used when creating the sequence (used for filename)
+        base_path: Directory to save JSON files
+        prefix: Optional prefix for filenames
+    """
+    os.makedirs(base_path, exist_ok=True)
+
+    for i, (assignments, seq) in enumerate(zip(manager.assignments, manager.seqs)):
+        manager.save_sequence_to_json(
+            assignments=assignments,
+            seq=seq,
+            index=i+1,
+            tol=tol,
+            sound_types_json=sound_types_json,
+            base_path=base_path,
+            prefix=prefix
+        )
