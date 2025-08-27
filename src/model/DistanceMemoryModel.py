@@ -214,3 +214,91 @@ class DistanceMemoryModel(nn.Module):
         else:
             from IPython.display import HTML
             return HTML(ani.to_jshtml())
+
+    def do_experiment(self, sound_list, yt_ids=None, verbose=False):
+        """
+        Run a sequence of sound file paths through the memory model,
+        and return trial-wise info for better downstream evaluation.
+    
+        Args:
+            sound_list (list of str): List of stimulus paths.
+            yt_ids (list of str or None): List of same length as sound_list indicating YT IDs or unique trial IDs.
+            verbose (bool): Print trial-by-trial info.
+    
+        Returns:
+            pd.DataFrame: Trial-level model output.
+        """
+        import pandas as pd
+    
+        self.clear_memory()
+    
+        seen_yt = {}
+        rows = []
+    
+        if yt_ids is None:
+            yt_ids = sound_list  # fallback: use filename as yt_id
+    
+        for i, (stim_path, yt_id) in enumerate(zip(sound_list, yt_ids)):
+            decision = self(stim_path).item()
+            
+            if yt_id in seen_yt:
+                repeat = 'true'
+                isi = i - seen_yt[yt_id] - 1
+            else:
+                repeat = 'false'
+                isi = -1
+                seen_yt[yt_id] = i
+    
+            row = {
+                'trial': i,
+                'stimulus': stim_path,
+                'yt_id': yt_id,
+                'response': int(decision),
+                'repeat': repeat,
+                'isi': isi
+            }
+            rows.append(row)
+    
+            if verbose:
+                print(f"{stim_path.split('/')[-1]} => Model: {'YES' if decision else 'NO'}, Truth: {'YES' if repeat == 'true' else 'NO'}, ISI={isi}")
+    
+        return pd.DataFrame(rows)
+
+    def export_responses_to_dataframe(self, metadata_df=None, additional_outputs=None):
+        """
+        Export trial-by-trial model responses and internal metrics to a Pandas DataFrame.
+        
+        Args:
+            metadata_df (pd.DataFrame or None): Optional DataFrame with metadata per trial.
+                Must include a 'stimulus' column that matches self.probe_filenames.
+            additional_outputs (dict or None): Optional dictionary of additional trial-wise metrics.
+                Example: {'min_dist': [...], 'likelihood': [...], etc.}
+        
+        Returns:
+            pd.DataFrame: Trial-level DataFrame with responses, correctness, and metadata.
+        """
+        import pandas as pd
+        
+        n_trials = len(self.decisions)
+        
+        df = pd.DataFrame({
+            'trial': self.trial_indices,
+            'stimulus': self.probe_filenames,
+            'model_response': self.decisions,
+            'true_repeat': [1 if fname in self.filenames_seen[:i] else 0 for i, fname in enumerate(self.probe_filenames)],
+        })
+        
+        # Add any additional per-trial metrics (e.g. distances, log-likelihoods)
+        if additional_outputs:
+            for key, values in additional_outputs.items():
+                assert len(values) == n_trials, f"{key} must have length {n_trials}"
+                df[key] = values
+        
+        # Merge with external metadata if provided
+        if metadata_df is not None:
+            assert 'stimulus' in metadata_df.columns, "'metadata_df' must contain a 'stimulus' column"
+            df = df.merge(metadata_df, on='stimulus', how='left')
+        
+        df['correct'] = (df['model_response'] == df['true_repeat']).astype(int)
+        
+        return df

@@ -8,6 +8,7 @@ def compute_dprime(hit_rate, fa_rate):
     fa_rate = np.clip(fa_rate, 1e-5, 1 - 1e-5)
     return norm.ppf(hit_rate) - norm.ppf(fa_rate)
 
+
 def recompute_dprime_by_isi(exps, criterion=1):
     hit_counts = defaultdict(int)
     fa_counts  = defaultdict(int)

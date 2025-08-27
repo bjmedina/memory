@@ -74,21 +74,28 @@ class AudioTextureEncoder(nn.Module):
             return None
 
 class PCASpace(nn.Module):
-    def __init__(self, encoder, n_components=2, device='cpu'):
+    def __init__(self, encoder, n_components=2, whiten=False, device='cpu'):
         super().__init__()
         self.encoder = encoder
         self.n_components = n_components
         self.device = device
         self.pca = None
+        self.whiten = whiten
 
     def fit(self, filepaths):
         """Fit PCA on a list of audio filepaths."""
         reps = []
         for path in filepaths:
-            rep = self.encoder(path).detach().cpu().numpy()
-            reps.append(rep)
+            
+            try:
+                with torch.no_grad():
+                    rep = self.encoder(path).detach().cpu().numpy()
+                reps.append(rep)
+            except AttributeError:
+                continue
+        
         X = np.vstack(reps)
-        self.pca = PCA(n_components=self.n_components)
+        self.pca = PCA(n_components=self.n_components, whiten=self.whiten)
         self.pca.fit(X)
 
     def transform(self, filepaths):

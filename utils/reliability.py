@@ -3,6 +3,96 @@ import pandas as pd
 from scipy.stats import pearsonr
 import random
 
+
+def estimate_split_half_reliability_balanced_by_participant_subsample(df, n_splits=100, seed=42):
+    """
+    Compute average split-half reliability by:
+    - randomly splitting participants each iteration,
+    - matching the number of responses per stimulus across halves,
+    - computing per-stimulus averages and correlating them.
+    """
+    np.random.seed(seed)
+    participant_ids = df.index.to_numpy()
+    n_participants = len(participant_ids)
+    corrs = []
+
+    for _ in range(n_splits):
+        shuffled = np.random.permutation(participant_ids)
+        half = n_participants // 2
+        group1_ids = shuffled[:half]
+        group2_ids = shuffled[half:]
+
+        # Get responses from each group
+        group1 = df.loc[group1_ids]
+        group2 = df.loc[group2_ids]
+
+        x_vals, y_vals = [], []
+
+        for stim in df.columns:
+            resp1 = group1[stim].dropna().values
+            resp2 = group2[stim].dropna().values
+            n_common = min(len(resp1), len(resp2))
+
+            if n_common < 2:
+                continue  # skip underpowered stimulus
+
+            sampled1 = np.random.choice(resp1, n_common, replace=False)
+            sampled2 = np.random.choice(resp2, n_common, replace=False)
+
+            x_vals.append(np.mean(sampled1))
+            y_vals.append(np.mean(sampled2))
+
+        if len(x_vals) >= 2:
+            r, _ = pearsonr(x_vals, y_vals)
+            corrs.append(r)
+
+    return np.mean(corrs), np.std(corrs)
+    
+def estimate_split_half_reliability_balanced_by_participant(df, n_splits=100, seed=42):
+    """
+    Compute average split-half reliability by:
+    - randomly splitting participants each iteration,
+    - upsampling responses to match number of participants in each split,
+    - computing per-stimulus averages and correlating them.
+    """
+    np.random.seed(seed)
+    participant_ids = df.index.to_numpy()
+    n_participants = len(participant_ids)
+    corrs = []
+
+    for _ in range(n_splits):
+        shuffled = np.random.permutation(participant_ids)
+        half = n_participants // 2
+        group1_ids = shuffled[:half]
+        group2_ids = shuffled[half:]
+
+        n1, n2 = len(group1_ids), len(group2_ids)
+
+        group1 = df.loc[group1_ids]
+        group2 = df.loc[group2_ids]
+
+        x_vals, y_vals = [], []
+
+        for stim in df.columns:
+            resp1 = group1[stim].dropna().values
+            resp2 = group2[stim].dropna().values
+
+            if len(resp1) < 2 or len(resp2) < 2:
+                continue  # skip underpowered stimuli
+
+            # Upsample with replacement to match n1, n2
+            padded1 = np.random.choice(resp1, size=n1, replace=True)
+            padded2 = np.random.choice(resp2, size=n2, replace=True)
+
+            x_vals.append(np.mean(padded1))
+            y_vals.append(np.mean(padded2))
+
+        if len(x_vals) >= 2:
+            r, _ = pearsonr(x_vals, y_vals)
+            corrs.append(r)
+
+    return np.mean(corrs), np.std(corrs)
+
 def estimate_split_half_reliability(df, n_splits=100, seed=42):
     """Compute average split-half reliability over multiple random splits."""
     np.random.seed(seed)
@@ -113,7 +203,7 @@ def compute_power_curve(df, n_repeats=20, n_splits=50, max_participants=None, st
         rs = []
         for _ in range(n_repeats):
             sample = df.sample(n=n, replace=False)
-            mean_r, std_r = estimate_split_half_reliability(sample, n_splits=n_splits)
+            mean_r, std_r = estimate_split_half_reliability_balanced_by_participant_subsample(sample, n_splits=n_splits)
             rs.append(mean_r)
 
         sizes.append(n)

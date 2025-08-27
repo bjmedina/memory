@@ -1,6 +1,9 @@
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+
+from scipy.stats import norm
 from scipy.stats import pearsonr
 
 
@@ -57,6 +60,7 @@ def plot_itemwise_split_half_scatter_df(
     np.random.seed(seed)
     x_vals, y_vals, item_ids = [], [], []
 
+    # need to make sure this is happening via group
     for _ in range(n_splits):
         indices = np.arange(df.shape[0])
         np.random.shuffle(indices)
