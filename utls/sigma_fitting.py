@@ -15,9 +15,18 @@ rather than an expensive multi-dimensional search.
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
+import json
+import os
+from datetime import datetime
 from scipy.stats import norm
 from sklearn.metrics import roc_auc_score
-from tqdm.notebook import trange
+
+try:
+    get_ipython()
+    from tqdm.notebook import trange
+except NameError:
+    from tqdm import trange
 
 from utls.toy_experiments import (
     make_toy_experiment_list,
@@ -623,3 +632,128 @@ def three_stage_fit(
         "stage_b": stage_b,
         "stage_c": stage_c,
     }
+
+
+# ── save / load ──────────────────────────────────────────────────────
+
+def save_three_stage_result(
+    fit_result,
+    save_dir,
+    config,
+    encoder_name,
+    task_name,
+    metric,
+    noise_mode,
+    t_step,
+    human_curve,
+    isis,
+    param_bounds,
+    fitting_settings=None,
+    prefix="three_stage",
+):
+    """
+    Persist a ``three_stage_fit`` result to disk.
+
+    Writes two files inside *save_dir*:
+
+    * ``<prefix>_<timestamp>.pkl`` — full payload (pickle).
+    * ``<prefix>_<timestamp>.json`` — human-readable metadata + fitted sigmas.
+
+    Parameters
+    ----------
+    fit_result : dict
+        Return value of :func:`three_stage_fit`.
+    save_dir : str
+        Directory to write into (created if absent).
+    config : dict
+        The raw YAML configuration dict that produced this run.
+    encoder_name, task_name, metric, noise_mode : str
+        Identifying strings for this run.
+    t_step : int
+        Noise-regime boundary.
+    human_curve : array-like
+        Human d' values used as fitting targets.
+    isis : list[int]
+        ISI values corresponding to *human_curve*.
+    param_bounds : dict
+        ``{"sigma0": (lo, hi), ...}`` bounds used for fitting.
+    fitting_settings : dict or None
+        Hyperparameters passed to ``three_stage_fit``
+        (n_grid, n_mc, n_refine_iters, etc.).
+    prefix : str
+        Filename prefix.
+
+    Returns
+    -------
+    dict
+        ``{"pkl_path": str, "json_path": str}``.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    fname_base = f"{prefix}_{timestamp}"
+
+    # ---- pickle: full payload ----
+    payload = {
+        "fit_result": fit_result,
+        "config": config,
+        "metadata": {
+            "encoder_name": encoder_name,
+            "task_name": task_name,
+            "metric": metric,
+            "noise_mode": noise_mode,
+            "t_step": t_step,
+            "human_curve": (
+                human_curve.tolist()
+                if hasattr(human_curve, "tolist")
+                else list(human_curve)
+            ),
+            "isis": list(isis),
+            "param_bounds": {k: list(v) for k, v in param_bounds.items()},
+            "timestamp": timestamp,
+            "fitting_settings": fitting_settings or {},
+        },
+    }
+
+    pkl_path = os.path.join(save_dir, f"{fname_base}.pkl")
+    with open(pkl_path, "wb") as f:
+        pickle.dump(payload, f)
+
+    # ---- JSON sidecar: human-readable summary ----
+    json_meta = {
+        "sigma0": fit_result["sigma0"],
+        "sigma1": fit_result["sigma1"],
+        "sigma2": fit_result["sigma2"],
+        "stage_a_best_mse": fit_result["stage_a"]["best_mse"],
+        "stage_b_best_mse": fit_result["stage_b"]["best_mse"],
+        "stage_c_best_mse": fit_result["stage_c"]["best_mse"],
+        **payload["metadata"],
+    }
+
+    json_path = os.path.join(save_dir, f"{fname_base}.json")
+    with open(json_path, "w") as f:
+        json.dump(json_meta, f, indent=2, default=str)
+
+    print(f"Saved three-stage result to {save_dir}/")
+    print(f"  pickle: {os.path.basename(pkl_path)}")
+    print(f"  json:   {os.path.basename(json_path)}")
+
+    return {"pkl_path": pkl_path, "json_path": json_path}
+
+
+def load_three_stage_result(pkl_path):
+    """
+    Load a saved three-stage fit result.
+
+    Parameters
+    ----------
+    pkl_path : str or Path
+        Path to the ``.pkl`` file written by :func:`save_three_stage_result`.
+
+    Returns
+    -------
+    dict
+        Keys: ``"fit_result"``, ``"config"``, ``"metadata"``.
+    """
+    with open(pkl_path, "rb") as f:
+        return pickle.load(f)
