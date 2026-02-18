@@ -1,0 +1,21 @@
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:209: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/subsample_analysis.py", line 437, in <module>
+    print(f"rep {rep}, {i} experiments")
+                        ^
+NameError: name 'i' is not defined. Did you mean: 'id'?
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:209: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/subsample_analysis.py", line 437, in <module>
+    print(f"rep {rep}, {i} experiments")
+                        ^
+NameError: name 'i' is not defined. Did you mean: 'id'?
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:209: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/subsample_analysis.py", line 437, in <module>
+    print(f"rep {rep}, {i} experiments")
+                        ^
+NameError: name 'i' is not defined. Did you mean: 'id'?

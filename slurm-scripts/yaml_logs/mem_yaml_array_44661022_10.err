@@ -1,0 +1,5 @@
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:209: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))
+/om2/user/gelbanna/miniconda3/envs/asr312/lib/python3.12/site-packages/chcochleagram/downsampling.py:68: UserWarning: Plan failed with a cudnnException: CUDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR: cudnnFinalize Descriptor Failed cudnn_status: CUDNN_STATUS_NOT_SUPPORTED (Triggered internally at /opt/conda/conda-bld/pytorch_1712608847532/work/aten/src/ATen/native/cudnn/Conv_v8.cpp:919.)
+  x = ch.nn.functional.conv1d(x, self.downsample_filter,
+slurmstepd: error: *** JOB 44661049 ON dgx001 CANCELLED AT 2026-02-02T11:11:39 ***

@@ -1,0 +1,4 @@
+Running combination:
+  Metric:     loglikelihood
+  Noise mode: exp-decay
+  Rate:       0.1

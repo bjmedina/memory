@@ -1,0 +1,2 @@
+ 68%|██████▊   | 13/19 [09:10<04:14, 42.39s/it] 35%|███▌      | 7/20 [04:32<08:25, 38.86s/it]utils.py:209: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))

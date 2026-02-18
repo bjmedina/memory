@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main_v2.py", line 26, in <module>
+    from encoders import *
+ModuleNotFoundError: No module named 'encoders'

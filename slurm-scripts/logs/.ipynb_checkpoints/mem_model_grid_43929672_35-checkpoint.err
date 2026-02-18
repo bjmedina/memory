@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main.py", line 146, in <module>
+    main(args)
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main.py", line 129, in main
+    plot_across_noise(NOISE_LEVELS, 
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/om2/user/bjmedina/auditory-memory/memory/utls/plotting.py", line 400, in plot_across_noise
+    std = [std]*len(t)
+           ^^^
+UnboundLocalError: cannot access local variable 'std' where it is not associated with a value

@@ -1,0 +1,4 @@
+=======================================
+SLURM_ARRAY_TASK_ID = 0
+YAML_PATH = /om2/user/bjmedina/auditory-memory/memory/model_yamls/run_000000.yaml
+=======================================

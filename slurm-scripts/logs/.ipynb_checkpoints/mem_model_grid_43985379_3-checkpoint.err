@@ -1,0 +1,4 @@
+usage: main.py [-h] --metric METRIC --noise_mode NOISE_MODE
+               [--encoder ENCODER] [--rate RATE] [--run_id RUN_ID]
+               [--save_base SAVE_BASE]
+main.py: error: argument --rate: invalid float value: '0.0.2'

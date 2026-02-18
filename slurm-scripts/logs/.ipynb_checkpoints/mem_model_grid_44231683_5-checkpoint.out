@@ -1,0 +1,20 @@
+=======================================
+Running combination:
+  Metric:     euclidean
+  Noise mode: exp-step
+  Rate:       0.01
+=======================================
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig01.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig01.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig02.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig02.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig03.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig03.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig04.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig04.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig05.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/DistanceMemoryModel_Fig05.pdf
+✅ All figures saved to /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/NoiseOverlay_ROC_overlay.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/NoiseOverlay_ROC_overlay.pdf
+💾 Saved full runs → /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/runs.pkl
+🧭 Saved metadata → /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_euclidean_exp-step_texture_statistics_rate0.01_prolific_batch/info.json
+Best σ₀ = 0.63  (α=1.693, β=-2.108, R²=0.903)
+[2.34707652 2.14573992 1.7975271  1.67237207 1.72537125 1.72915931
+ 1.74583169 1.70514195 1.64084881]
+✅ Completed: {'model_name': 'DistanceMemoryModel', 'metric': 'euclidean', 'noise_mode': 'exp-step', 'encoder': 'texture_statistics', 'rate': 0.01, 'run_id': 'prolific_batch'}
+✅ Done: metric=euclidean, noise_mode=exp-step, rate=0.01

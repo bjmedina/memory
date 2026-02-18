@@ -1,0 +1,20 @@
+=======================================
+Running combination:
+  Metric:     cosine
+  Noise mode: exp-step
+  Rate:       0.5
+=======================================
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig01.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig01.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig02.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig02.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig03.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig03.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig04.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig04.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig05.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/DistanceMemoryModel_Fig05.pdf
+✅ All figures saved to /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/NoiseOverlay_ROC_overlay.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/NoiseOverlay_ROC_overlay.pdf
+💾 Saved full runs → /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/runs.pkl
+🧭 Saved metadata → /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/DistanceMemoryModel_cosine_exp-step_texture_statistics_rate0.5_prolific_batch/info.json
+Best σ₀ = 0.158  (α=0.262, β=0.134, R²=0.932)
+[6.26215201 5.51320104 4.07456015 2.21915925 2.35940161 2.264395
+ 2.35318289 2.27538871 2.3087594 ]
+✅ Completed: {'model_name': 'DistanceMemoryModel', 'metric': 'cosine', 'noise_mode': 'exp-step', 'encoder': 'texture_statistics', 'rate': 0.5, 'run_id': 'prolific_batch'}
+✅ Done: metric=cosine, noise_mode=exp-step, rate=0.5

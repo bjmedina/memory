@@ -1,0 +1,2 @@
+/var/slurm/slurmd/job44002876/slurm_script: line 22: 2996444 Killed                  python3 /om2/user/bjmedina/auditory-memory/memory/src/model/main-singleisi.py --save_base "/om2/user/bjmedina/auditory-memory/memory/figures/model-behavior_v9/"
+slurmstepd: error: Detected 1 oom-kill event(s) in StepId=44002876.batch. Some of your processes may have been killed by the cgroup out-of-memory handler.

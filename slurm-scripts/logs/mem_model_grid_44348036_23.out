@@ -1,0 +1,9 @@
+=======================================
+Running combination:
+  Metric:     cosine
+  Noise mode: const-step-v2
+  Rate:       3
+=======================================
+
+=== Running model at rate=0.0794 ===
+✅ Done: metric=cosine, noise_mode=const-step-v2, rate=3

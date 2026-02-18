@@ -35,7 +35,6 @@ class DistanceMemoryModel(nn.Module):
         self.trial_indices = []
         self.pca_result = None
         self.pca_ready = False
-
         self.filenames_seen = []
         self.probe_filenames = []
 
@@ -47,6 +46,14 @@ class DistanceMemoryModel(nn.Module):
 
         print(f"Debug flag is set to {self.debug_mode}")
 
+    def _fill_memory_bank(self, sound_list):
+        # TODO
+        self.memory_bank = []
+        for sound in sound_list:
+            rep = self.encode_sound(sound)
+            self.memory_bank.append(rep)
+    
+    
     def clear_memory(self):
         """Clear all stored memory representations."""
         self.memory_bank = []
@@ -69,7 +76,7 @@ class DistanceMemoryModel(nn.Module):
         """Simulate memory drift by applying noise to memory representations."""
         noisy_bank = []
         for rep in self.memory_bank:
-            noise = torch.randn_like(rep) * self.noise_variance
+            noise     = torch.randn_like(rep) * self.noise_variance
             noisy_rep = rep + noise
             noisy_bank.append(noisy_rep)
         self.memory_bank = noisy_bank
@@ -125,20 +132,6 @@ class DistanceMemoryModel(nn.Module):
         
         # Store ground-truth filename
         self.filenames_seen.append(sound)
-
-        def compute_pca_projection(self):
-            from sklearn.decomposition import PCA
-            all_reps = torch.vstack(self.memory_snapshots + self.probe_reps)
-            pca = PCA(n_components=2)
-            self.pca_result = pca.fit_transform(all_reps.numpy())
-            self.pca_ready = True
-        
-            # Compute indices for later slicing
-            self._mem_lens = [m.shape[0] for m in self.memory_snapshots]
-            self._mem_offsets = [sum(self._mem_lens[:i]) for i in range(len(self._mem_lens))]
-            self._probe_indices = [
-                offset + self._mem_lens[i] for i, offset in enumerate(self._mem_offsets)
-            ]
 
         return decision
 

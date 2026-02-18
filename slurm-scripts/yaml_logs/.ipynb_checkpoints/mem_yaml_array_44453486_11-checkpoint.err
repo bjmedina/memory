@@ -1,0 +1,8 @@
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:652: SyntaxWarning: invalid escape sequence '\s'
+  f"$\sigma_0$={params['sigma0']:.2f}  |  $\sigma_1$={params['sigma1']:.2f}  |  mode={params['noise_mode']}"
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:652: SyntaxWarning: invalid escape sequence '\s'
+  f"$\sigma_0$={params['sigma0']:.2f}  |  $\sigma_1$={params['sigma1']:.2f}  |  mode={params['noise_mode']}"
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:871: SyntaxWarning: invalid escape sequence '\m'
+  ax.set_title(title + f" $\mu={mu:.3f}$", fontsize=12)
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:148: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))

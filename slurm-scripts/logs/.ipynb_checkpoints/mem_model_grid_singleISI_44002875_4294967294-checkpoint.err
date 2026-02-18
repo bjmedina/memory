@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main-singleisi.py", line 519, in <module>
+    main(args)
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main-singleisi.py", line 324, in main
+    best_fits = plot_model_grid_summary(all_data, human_curve, isis, args.save_base, returns=True)
+                                        ^^^^^^^^
+NameError: name 'all_data' is not defined. Did you mean: 'run_data'?

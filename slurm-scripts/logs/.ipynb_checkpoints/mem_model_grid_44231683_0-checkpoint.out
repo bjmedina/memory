@@ -1,0 +1,20 @@
+=======================================
+Running combination:
+  Metric:     loglikelihood
+  Noise mode: exp-step
+  Rate:       0.01
+=======================================
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig01.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig01.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig02.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig02.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig03.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig03.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig04.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig04.pdf
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig05.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/LikelihoodMemoryModel_Fig05.pdf
+✅ All figures saved to /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch
+Saved /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/NoiseOverlay_ROC_overlay.png and /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/NoiseOverlay_ROC_overlay.pdf
+💾 Saved full runs → /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/runs.pkl
+🧭 Saved metadata → /om2/user/bjmedina/auditory-memory/memory/figures/model-behavior-step-functions/LikelihoodMemoryModel_loglikelihood_exp-step_texture_statistics_rate0.01_prolific_batch/info.json
+Best σ₀ = 2.51  (α=1.937, β=0.548, R²=0.938)
+[0.71555871 0.44869912 0.23719025 0.19133596 0.13242214 0.10466082
+ 0.10431857 0.04229682 0.11283723]
+✅ Completed: {'model_name': 'LikelihoodMemoryModel', 'metric': 'loglikelihood', 'noise_mode': 'exp-step', 'encoder': 'texture_statistics', 'rate': 0.01, 'run_id': 'prolific_batch'}
+✅ Done: metric=loglikelihood, noise_mode=exp-step, rate=0.01

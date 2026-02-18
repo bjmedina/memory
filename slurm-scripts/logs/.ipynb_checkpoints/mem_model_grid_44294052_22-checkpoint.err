@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main.py", line 37, in <module>
+    from utls.runners import run_experiment_scores
+  File "/om2/user/bjmedina/auditory-memory/memory/utls/runners.py", line 201
+    "const", "linear-step", "const-step", "exp-step", "exp-step-v2", "linear-step-v2"}}
+                                                                                      ^
+SyntaxError: closing parenthesis '}' does not match opening parenthesis '(' on line 100

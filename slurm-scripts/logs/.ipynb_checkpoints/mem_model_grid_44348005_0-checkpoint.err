@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main.py", line 239, in <module>
+    main(args)
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main.py", line 143, in main
+    print(f"\n=== Running model at rate={rate_val:.4f} ===")
+                                         ^^^^^^^^
+NameError: name 'rate_val' is not defined

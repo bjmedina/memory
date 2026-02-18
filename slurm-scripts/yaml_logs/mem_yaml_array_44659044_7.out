@@ -1,0 +1,107 @@
+=======================================
+SLURM_ARRAY_TASK_ID = 7
+YAML_PATH = /om2/user/bjmedina/auditory-memory/memory/model_yamls/three-regime/resnet50/run_000007.yaml
+=======================================
+Running config:
+  YAML: /om2/user/bjmedina/auditory-memory/memory/model_yamls/three-regime/resnet50/run_000007.yaml
+  Encoder: resnet50
+  Metric: cosine
+  Noise: three-regime
+/om2/user/bjmedina/auditory-memory/memory/figures/figures_v11_three-regime_cosine_median_dist/glob-music/resnet50/cosine/three-regime/ /om2/user/bjmedina/auditory-memory/memory/fits/fits_v11_three-regime_cosine_median_dist_best
+Directory already exists: /om2/user/bjmedina/auditory-memory/memory/figures/figures_v11_three-regime_cosine_median_dist/glob-music/resnet50/cosine/three-regime/
+Directory already exists: /om2/user/bjmedina/auditory-memory/memory/fits/fits_v11_three-regime_cosine_median_dist_best
+Directory already exists: /om2/user/bjmedina/auditory-memory/memory/fits/fits_v11_three-regime_cosine_median_dist_all
+Encoder name: resnet50-input_after_preproc
+LOADING FROM /om2/user/bjmedina/models/cochdnn/model_directories/resnet50_word_speaker_audioset/
+=> loading checkpoint '/om2/user/bjmedina/models/cochdnn/model_checkpoints/audio_rep_training_cochleagram_1/standard_training_word_and_audioset_and_speaker_decay_lr/542752d7-9849-49ff-b84a-6758a81585b4/5_checkpoint.pt'
+=> loaded checkpoint '/om2/user/bjmedina/models/cochdnn/model_checkpoints/audio_rep_training_cochleagram_1/standard_training_word_and_audioset_and_speaker_decay_lr/542752d7-9849-49ff-b84a-6758a81585b4/5_checkpoint.pt' (epoch 6)
+median distance: 0.03869386139317277
+there are 22 candidates
+Stage A best sigma0: 0.018450509827180293 mse_isi0: 0.24253627549904017
+(0.016605458844462264, 0.020295560809898323)
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.00035897377334692535, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.004625813938895799, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.004625813938895799, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.004625813938895799, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.01660545884446227, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.01660545884446227, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.01660545884446227, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.01660545884446227, 'sigma1': 0.01660545884446227, 'sigma2': 0.004625813938895799, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.00035897377334692535, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.004625813938895799, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.004625813938895799, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.004625813938895799, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.01660545884446227, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.01660545884446227, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.01660545884446227, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.017459766226316543, 'sigma1': 0.01660545884446227, 'sigma2': 0.004625813938895799, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.00035897377334692535, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.004625813938895799, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.004625813938895799, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.004625813938895799, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.01660545884446227, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.01660545884446227, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.01660545884446227, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.01835802548625663, 'sigma1': 0.01660545884446227, 'sigma2': 0.004625813938895799, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.00035897377334692535, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.004625813938895799, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.004625813938895799, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.004625813938895799, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.01660545884446227, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.01660545884446227, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.01660545884446227, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.01930249783333713, 'sigma1': 0.01660545884446227, 'sigma2': 0.004625813938895799, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.00035897377334692535, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.0012886216995092962, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.004625813938895799, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.004625813938895799, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.004625813938895799, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.01660545884446227, 'sigma2': 0.00010000000000000009, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.01660545884446227, 'sigma2': 0.00035897377334692535, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.01660545884446227, 'sigma2': 0.0012886216995092962, 't_step': 5.0}
+trying out {'sigma0': 0.02029556080989832, 'sigma1': 0.01660545884446227, 'sigma2': 0.004625813938895799, 't_step': 5.0}
+Stage B best params: {'sigma0': 0.017459766226316543, 'sigma1': 0.01660545884446227, 'sigma2': 0.00035897377334692535, 't_step': 5.0, 'noise_mode': 'three-regime', 'metric': 'cosine', 'layer': 'resnet50-input_after_preproc', 'encoder': 'resnet50-input_after_preproc', 'stimulus_set': 'Globalized Music'}
+Stage B mse_per_isi: [0.3590886  0.02123393 0.0347686  0.14153004 0.27822309 0.29160193
+ 0.2211397  0.04718628]
+Stage B obj (ISI>=1 mean): 0.1479547970347325
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.014944912960016049, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.014944912960016049, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.014944912960016049, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.016522222937630972, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.016522222937630972, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.016522222937630972, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.018266004728908495, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.018266004728908495, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608158417951832, 'sigma1': 0.018266004728908495, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.014944912960016049, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.014944912960016049, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.014944912960016049, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.016522222937630972, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.016522222937630972, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.016522222937630972, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.018266004728908495, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.018266004728908495, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11608738811363258, 'sigma1': 0.018266004728908495, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.014944912960016049, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.014944912960016049, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.014944912960016049, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.016522222937630972, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.016522222937630972, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.016522222937630972, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.018266004728908495, 'sigma2': 0.00032307639601223266, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.018266004728908495, 'sigma2': 0.0003571743947309497, 't_step': 5.0}
+refined search candidate: {'sigma0': 0.11609319233793627, 'sigma1': 0.018266004728908495, 'sigma2': 0.0003948711506816179, 't_step': 5.0}
+REFINED best params: {'sigma0': 0.11608158417951832, 'sigma1': 0.014944912960016049, 'sigma2': 0.00032307639601223266, 't_step': 5, 'noise_mode': 'three-regime', 'metric': 'cosine', 'layer': 'resnet50-input_after_preproc', 'encoder': 'resnet50-input_after_preproc', 'stimulus_set': 'Globalized Music'}
+REFINED mse_per_isi: [13.07823342  7.35611562  2.59602317  1.22372418  1.35537951  1.0236817
+  0.93782507  0.31901767]
+REFINED obj: 2.1159667013172796
+✔ Saved 1 best models to /om2/user/bjmedina/auditory-memory/memory/fits/fits_v11_three-regime_cosine_median_dist_all

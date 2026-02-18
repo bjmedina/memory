@@ -1,0 +1,4 @@
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main_v2.py", line 129
+    save_figs = (
+                ^
+SyntaxError: '(' was never closed

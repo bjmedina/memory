@@ -1,0 +1,7 @@
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:148: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main_v2.py", line 121, in <module>
+    assert t_step is not None, "two-regime requires t_step"
+           ^^^^^^
+NameError: name 't_step' is not defined

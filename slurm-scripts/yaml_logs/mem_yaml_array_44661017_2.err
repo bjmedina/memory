@@ -1,0 +1,4 @@
+/var/slurm/slurmd/job44661020/slurm_script: line 27: sq: command not found
+/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:209: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))
+slurmstepd: error: *** JOB 44661020 ON node063 CANCELLED AT 2026-02-02T11:11:55 ***

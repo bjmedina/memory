@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main.py", line 232, in <module>
+    main(args)
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main.py", line 152, in main
+    curves, runs = rocs_across_noise(
+                   ^^^^^^^^^^^^^^^^^^
+  File "/om2/user/bjmedina/auditory-memory/memory/utls/analysis_helpers.py", line 201, in rocs_across_noise
+    run = runner(
+          ^^^^^^^
+  File "/om2/user/bjmedina/auditory-memory/memory/utls/runners.py", line 22, in run_experiment_scores
+    assert noise_mode in {"diffuse", "decay", "power-law", "exp-law", "power-decay", "exp-decay", "const"}
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

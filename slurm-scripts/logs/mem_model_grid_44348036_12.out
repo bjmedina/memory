@@ -1,0 +1,9 @@
+=======================================
+Running combination:
+  Metric:     euclidean
+  Noise mode: const-step-v2
+  Rate:       2
+=======================================
+
+=== Running model at rate=0.0398 ===
+✅ Done: metric=euclidean, noise_mode=const-step-v2, rate=2

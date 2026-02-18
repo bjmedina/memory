@@ -1,0 +1,9 @@
+/om2/user/bjmedina/auditory-memory/memory//om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:148: RuntimeWarning: Mean of empty slice
+  dprimes.append(np.nanmean(aucs))
+Traceback (most recent call last):
+  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main_v2.py", line 164, in <module>
+    encoder = build_encoder(encoder_cfg)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py", line 239, in build_encoder
+    raise ValueError(f"Unsupported encoder type: {etype}")
+ValueError: Unsupported encoder type: texture
