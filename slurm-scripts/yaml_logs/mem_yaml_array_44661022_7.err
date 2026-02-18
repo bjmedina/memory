@@ -1,3 +1,0 @@
-/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:209: RuntimeWarning: Mean of empty slice
-  dprimes.append(np.nanmean(aucs))
-slurmstepd: error: *** JOB 44661042 ON node080 CANCELLED AT 2026-02-02T11:11:39 ***

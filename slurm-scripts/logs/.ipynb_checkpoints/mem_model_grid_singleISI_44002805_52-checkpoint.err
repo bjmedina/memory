@@ -1,4 +1,0 @@
-  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main-singleisi.py", line 8
-    %load_ext autoreload
-    ^
-SyntaxError: invalid syntax

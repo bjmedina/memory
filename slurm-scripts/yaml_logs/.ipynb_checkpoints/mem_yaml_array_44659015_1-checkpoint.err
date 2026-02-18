@@ -1,9 +1,0 @@
-/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:209: RuntimeWarning: Mean of empty slice
-  dprimes.append(np.nanmean(aucs))
-Traceback (most recent call last):
-  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main_v4.py", line 238, in <module>
-    ensure_dir(save_figs)
-  File "/om2/user/bjmedina/auditory-memory/memory/utls/plotting.py", line 89, in ensure_dir
-    os.makedirs(dir_path)
-  File "<frozen os>", line 225, in makedirs
-FileExistsError: [Errno 17] File exists: '/om2/user/bjmedina/auditory-memory/memory/figures/figures_v11_three-regime_cosine_median_dist/env-sounds/resnet50/cosine/three-regime/'

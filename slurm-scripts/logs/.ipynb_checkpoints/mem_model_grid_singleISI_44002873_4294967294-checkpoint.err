@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main-singleisi.py", line 517, in <module>
-    main(args)
-  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main-singleisi.py", line 293, in main
-    for result in t_results:
-                  ^^^^^^^^^
-NameError: name 't_results' is not defined. Did you mean: 'results'?

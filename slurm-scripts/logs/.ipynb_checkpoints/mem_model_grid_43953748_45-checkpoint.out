@@ -1,7 +1,0 @@
-=======================================
-Running combination:
-  Metric:     manhattan
-  Noise mode: power-decay
-  Rate:       0.5
-=======================================
-✅ Done: metric=manhattan, noise_mode=power-decay, rate=0.5

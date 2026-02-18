@@ -1,9 +1,0 @@
-/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:1193: SyntaxWarning: invalid escape sequence '\s'
-  f"$\sigma_0$={params['sigma0']:.2f}  |  $\sigma_1$={params['sigma1']:.2f}  |  mode={params['noise_mode']}"
-/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:1193: SyntaxWarning: invalid escape sequence '\s'
-  f"$\sigma_0$={params['sigma0']:.2f}  |  $\sigma_1$={params['sigma1']:.2f}  |  mode={params['noise_mode']}"
-/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:1426: SyntaxWarning: invalid escape sequence '\m'
-  ax.set_title(f"{title} ($\mu={mu:.3f}$)")
-/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:209: RuntimeWarning: Mean of empty slice
-  dprimes.append(np.nanmean(aucs))
-slurmstepd: error: *** JOB 44660452 ON node063 CANCELLED AT 2026-02-02T01:30:11 ***

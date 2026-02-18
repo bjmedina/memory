@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main-singleisi.py", line 513, in <module>
-    parser = argparse.ArgumentParser()
-             ^^^^^^^^
-NameError: name 'argparse' is not defined. Did you forget to import 'argparse'?

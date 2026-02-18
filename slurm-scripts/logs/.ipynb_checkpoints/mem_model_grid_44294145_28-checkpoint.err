@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "/om2/user/bjmedina/auditory-memory/memory/src/model/main.py", line 37, in <module>
-    from utls.runners import run_experiment_scores
-  File "/om2/user/bjmedina/auditory-memory/memory/utls/runners.py", line 100
-    std = sigma0 * np.exp(t_step * (rate if rate is not None else))
-                                                                 ^
-SyntaxError: invalid syntax

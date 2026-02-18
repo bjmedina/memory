@@ -1,9 +1,0 @@
-=======================================
-Running combination:
-  Metric:     loglikelihood
-  Noise mode: const-step-v2
-  Rate:       1
-=======================================
-
-=== Running model at rate=0.0199 ===
-✅ Done: metric=loglikelihood, noise_mode=const-step-v2, rate=1

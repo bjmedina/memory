@@ -1,2 +1,0 @@
-/om2/user/bjmedina/auditory-memory/memory/utls/runners_utils.py:148: RuntimeWarning: Mean of empty slice
-  dprimes.append(np.nanmean(aucs))

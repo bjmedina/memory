@@ -1,7 +1,0 @@
-=======================================
-Running combination:
-  Metric:     manhattan
-  Noise mode: const
-  Rate:       0.0
-=======================================
-✅ Done: metric=manhattan, noise_mode=const, rate=0.0

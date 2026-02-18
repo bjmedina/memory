@@ -1,7 +1,0 @@
-=======================================
-Running combination:
-  Metric:     loglikelihood
-  Noise mode: exp-step-v2
-  Rate:       0.01
-=======================================
-✅ Done: metric=loglikelihood, noise_mode=exp-step-v2, rate=0.01
