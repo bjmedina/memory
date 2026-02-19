@@ -32,9 +32,9 @@ def base_config(n_samples=50, n_seqs=36):
 
 
 def three_regime_noise(
-    sigma0_min=1.0, sigma0_max=25.0,
-    sigma1_min=0.01, sigma1_max=5.0,
-    sigma2_min=0.0005, sigma2_max=2.0,
+    sigma0_min=1.0, sigma0_max=40.0,
+    sigma1_min=0.1, sigma1_max=40.0,
+    sigma2_min=0.0005, sigma2_max=20.0,
     t_step=5,
 ):
     """Default three-regime noise config."""
@@ -65,7 +65,7 @@ def fitting_test_defaults():
     """Default three_stage_fit hyperparameters."""
     return {
         "n_grid": 5,
-        "n_mc": 3,
+        "n_mc": 32,
         "n_refine_iters": 4,
         "n_experiments_per_isi": 5,
         "k_stimuli_per_exp": 5,
