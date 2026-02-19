@@ -55,7 +55,7 @@ def fitting_defaults():
     return {
         "n_grid": 15,
         "n_mc": 32,
-        "n_refine_iters": 2,
+        "n_refine_iters": 3,
         "n_experiments_per_isi": 20,
         "k_stimuli_per_exp": 10,
     }
@@ -73,22 +73,35 @@ METRICS = ["cosine"]
 
 NOISE_MODELS = [three_regime_noise()]
 
+# REPRESENTATIONS = [
+#     # resnet50 layers
+#     ("resnet50", {"layer": [
+#         "input_after_preproc", "conv1_relu1",
+#         "layer1", "layer2", "layer3", "layer4", "avgpool",
+#     ]}),
+#     # kell2018 layers
+#     ("kell2018", {"layer": [
+#         "relu0", "relu1", "relu2", "relu3", "relu4", "relufc",
+#     ]}),
+#     # texture PCA dimensions (only for atexts)
+#     ("texture_pca", {"pc_dims": [64, 128, 256, 512, 1028]}),
+# ]
+
+# TIME_AVG_OPTIONS = [True, False]
+
+
 REPRESENTATIONS = [
     # resnet50 layers
     ("resnet50", {"layer": [
-        "input_after_preproc", "conv1_relu1",
-        "layer1", "layer2", "layer3", "layer4", "avgpool",
+         "layer3", "layer4", "avgpool",
     ]}),
     # kell2018 layers
     ("kell2018", {"layer": [
-        "relu0", "relu1", "relu2", "relu3", "relu4", "relufc",
-    ]}),
-    # texture PCA dimensions (only for atexts)
-    ("texture_pca", {"pc_dims": [64, 128, 256, 512, 1028]}),
+        "relu4", "relufc",
+    ]})
 ]
 
 TIME_AVG_OPTIONS = [True, False]
-
 
 # ── generation ────────────────────────────────────────────────────────
 
