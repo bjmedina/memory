@@ -5,6 +5,20 @@
 #
 # Usage:  bash slurm-scripts/test_v5_pipeline.sh
 
+#SBATCH -J mem_v5_array
+#SBATCH -p normal
+#SBATCH -t 0-12:00:00
+#SBATCH -n 1
+#SBATCH -c 1
+#SBATCH --mem=20G
+#SBATCH --gres=gpu:1
+#SBATCH --array=0-82
+#SBATCH -o yaml_logs/%x_%A_%a.out
+#SBATCH -e yaml_logs/%x_%A_%a.err
+
+source activate /om2/user/gelbanna/miniconda3/envs/asr312
+cd /om2/user/bjmedina/auditory-memory/memory || exit 1
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

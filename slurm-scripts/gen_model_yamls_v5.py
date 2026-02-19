@@ -32,9 +32,9 @@ def base_config(n_samples=50, n_seqs=36):
 
 
 def three_regime_noise(
-    sigma0_min=0.7, sigma0_max=0.75,
-    sigma1_min=0.1, sigma1_max=0.6,
-    sigma2_min=0.0005, sigma2_max=0.1,
+    sigma0_min=1.0, sigma0_max=25.0,
+    sigma1_min=0.01, sigma1_max=5.0,
+    sigma2_min=0.0005, sigma2_max=2.0,
     t_step=5,
 ):
     """Default three-regime noise config."""
@@ -57,7 +57,18 @@ def fitting_defaults():
         "n_mc": 32,
         "n_refine_iters": 3,
         "n_experiments_per_isi": 20,
-        "k_stimuli_per_exp": 10,
+        "k_stimuli_per_exp": 5,
+    }
+
+
+def fitting_test_defaults():
+    """Default three_stage_fit hyperparameters."""
+    return {
+        "n_grid": 5,
+        "n_mc": 3,
+        "n_refine_iters": 4,
+        "n_experiments_per_isi": 5,
+        "k_stimuli_per_exp": 5,
     }
 
 
@@ -112,13 +123,16 @@ def write_yaml(cfg, out_dir, run_idx):
 
 
 def main():
+
+    TEST = True
+    
     parser = argparse.ArgumentParser(
         description="Generate YAML configs for three-stage fitting via main_v5.py"
     )
     parser.add_argument(
         "--out-dir", type=str,
-        default="../model_yamls/v13_three-stage",
-        help="Output directory for YAML files (default: ../model_yamls/v13_three-stage)",
+        default="../model_yamls/v14_three-stage-testing",
+        help="Output directory for YAML files (default: ../model_yamls/v14_three-stage-testing)",
     )
     args = parser.parse_args()
 
@@ -145,7 +159,10 @@ def main():
                         cfg["experiment"]["which_task"] = task_id
                         cfg["metric"] = metric
                         cfg["noise_model"] = copy.deepcopy(noise)
-                        cfg["fitting"] = fitting_defaults()
+                        if TEST:
+                            cfg["fitting"] = fitting_test_defaults()
+                        else:
+                            cfg["fitting"] = fitting_defaults()
 
                         # ---- layer-based representations ----
                         if "layer" in repr_params:
