@@ -32,9 +32,9 @@ def base_config(n_samples=50, n_seqs=36):
 
 
 def three_regime_noise(
-    sigma0_min=0.7, sigma0_max=0.75,
-    sigma1_min=0.1, sigma1_max=0.6,
-    sigma2_min=0.0005, sigma2_max=0.1,
+    sigma0_min=1.0, sigma0_max=20.0,
+    sigma1_min=0.5, sigma1_max=7.0,
+    sigma2_min=0.05, sigma2_max=1.0,
     t_step=5,
 ):
     """Default three-regime noise config."""
@@ -55,9 +55,9 @@ def fitting_defaults():
     return {
         "n_grid": 15,
         "n_mc": 32,
-        "n_refine_iters": 2,
+        "n_refine_iters": 3,
         "n_experiments_per_isi": 20,
-        "k_stimuli_per_exp": 10,
+        "k_stimuli_per_exp": 5,
     }
 
 
@@ -73,18 +73,27 @@ METRICS = ["cosine"]
 
 NOISE_MODELS = [three_regime_noise()]
 
+# REPRESENTATIONS = [
+#     # resnet50 layers
+#     ("resnet50", {"layer": [
+#         "input_after_preproc", "conv1_relu1",
+#         "layer1", "layer2", "layer3", "layer4", "avgpool",
+#     ]}),
+#     # kell2018 layers
+#     ("kell2018", {"layer": [
+#         "relu0", "relu1", "relu2", "relu3", "relu4", "relufc",
+#     ]}),
+#     # texture PCA dimensions (only for atexts)
+#     ("texture_pca", {"pc_dims": [64, 128, 256, 512, 1028]}),
+# ]
+
 REPRESENTATIONS = [
     # resnet50 layers
-    ("resnet50", {"layer": [
-        "input_after_preproc", "conv1_relu1",
-        "layer1", "layer2", "layer3", "layer4", "avgpool",
+    ("resnet50", {"layer": ["layer3", "layer4", "avgpool",
     ]}),
     # kell2018 layers
-    ("kell2018", {"layer": [
-        "relu0", "relu1", "relu2", "relu3", "relu4", "relufc",
-    ]}),
-    # texture PCA dimensions (only for atexts)
-    ("texture_pca", {"pc_dims": [64, 128, 256, 512, 1028]}),
+    ("kell2018", {"layer": ["relu3", "relu4", "relufc",
+    ]})
 ]
 
 TIME_AVG_OPTIONS = [True, False]
