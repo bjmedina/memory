@@ -31,6 +31,7 @@ except NameError:
 from utls.toy_experiments import (
     make_toy_experiment_list,
     make_multi_isi_toy_experiments,
+    infer_trial_isis,
 )
 
 
@@ -757,3 +758,156 @@ def load_three_stage_result(pkl_path):
     """
     with open(pkl_path, "rb") as f:
         return pickle.load(f)
+
+
+# ── multi-ISI sequence evaluation ────────────────────────────────────
+
+
+def evaluate_sigma_on_multi_isi_sequences(
+    run_experiment_fn,
+    sigma_value,
+    sigma_name,
+    fixed_sigmas,
+    noise_mode,
+    metric,
+    X0,
+    name_to_idx,
+    experiment_list,
+    isi_keys,
+    target_isis,
+    human_dprimes_by_isi,
+    t_step,
+    n_seqs_per_rep=10,
+    n_mc=32,
+    seed=0,
+):
+    """
+    Evaluate one sigma candidate on compact multi-ISI sequences.
+
+    Unlike :func:`evaluate_sigma_on_toy_experiments` (which expects each
+    experiment to contain a single ISI), this function handles sequences
+    that contain repeat pairs at *multiple* ISI values.  For each MC rep
+    it samples a subset of sequences, runs the model, and splits hits by
+    ISI using :func:`~utls.toy_experiments.infer_trial_isis`.
+
+    Parameters
+    ----------
+    run_experiment_fn : callable
+        ``run_experiment_scores`` from ``utls.runners_v2``.
+    sigma_value : float
+        Value of the sigma being evaluated.
+    sigma_name : str
+        Which sigma (``"sigma0"``, ``"sigma1"``, or ``"sigma2"``).
+    fixed_sigmas : dict
+        Values of the other (already-fitted) sigmas.
+    noise_mode, metric, X0, name_to_idx, t_step :
+        Forwarded to *run_experiment_fn*.
+    experiment_list : list[list]
+        Multi-ISI experiment sequences (stimulus file paths).
+    isi_keys : list[list[int]]
+        ISI label per position for each sequence.
+    target_isis : list[int]
+        ISI values to compute d' for (e.g. ``[8, 16, 32, 64]``).
+    human_dprimes_by_isi : dict[int, float]
+        ISI -> target human d'.
+    n_seqs_per_rep : int
+        Sequences sampled (without replacement) per MC repetition.
+    n_mc : int
+        Monte-Carlo repetitions.
+    seed : int
+        Base random seed.
+
+    Returns
+    -------
+    dict
+        ``sigma_value``, ``mse_mean``, ``mse_std``,
+        ``dprime_mean_by_isi``, ``dprime_std_by_isi``.
+    """
+    sigmas = dict(fixed_sigmas)
+    sigmas[sigma_name] = sigma_value
+
+    # Pre-compute trial ISIs for each sequence
+    seq_trial_isis = [infer_trial_isis(seq) for seq in experiment_list]
+
+    mse_per_rep = []
+    dprime_per_rep = {isi: [] for isi in target_isis}
+
+    for rep in range(n_mc):
+        rng = np.random.default_rng(seed + rep)
+        n_sample = min(n_seqs_per_rep, len(experiment_list))
+        seq_indices = rng.choice(
+            len(experiment_list), size=n_sample, replace=False
+        )
+
+        all_hits, all_isis_for_hits, all_fas = [], [], []
+        for si in seq_indices:
+            seq = experiment_list[si]
+            t_isis = seq_trial_isis[si]
+            run_out = run_experiment_fn(
+                sigma0=sigmas["sigma0"],
+                sigma1=sigmas.get("sigma1", 0.0),
+                sigma2=sigmas.get("sigma2", 0.0),
+                t_step=t_step,
+                rate=0,
+                noise_mode=noise_mode,
+                metric=metric,
+                X0=X0,
+                name_to_idx=name_to_idx,
+                experiment_list=[seq],
+                debug=False,
+                seed=seed + rep * 1000 + int(si),
+            )
+            h = np.asarray(run_out["hits"])
+            f = np.asarray(run_out["fas"])
+            if len(h) != len(t_isis):
+                continue
+            all_hits.append(h)
+            all_isis_for_hits.extend(t_isis)
+            all_fas.append(f)
+
+        if not all_hits:
+            continue
+        hits_arr = np.concatenate(all_hits)
+        isis_arr = np.array(all_isis_for_hits)
+        fas_arr = np.concatenate(all_fas) if all_fas else np.array([])
+        if len(fas_arr) == 0:
+            continue
+
+        rep_mse = []
+        for isi_val in target_isis:
+            mask = isis_arr == isi_val
+            hits_isi = hits_arr[mask]
+            if len(hits_isi) == 0:
+                continue
+            human_dp = human_dprimes_by_isi.get(isi_val)
+            if human_dp is None:
+                continue
+            y = np.concatenate(
+                [np.ones(len(hits_isi)), np.zeros(len(fas_arr))]
+            )
+            dp = auc_to_dprime(
+                roc_auc_score(y, -np.concatenate([hits_isi, fas_arr]))
+            )
+            rep_mse.append((dp - human_dp) ** 2)
+            dprime_per_rep[isi_val].append(dp)
+
+        if rep_mse:
+            mse_per_rep.append(np.mean(rep_mse))
+
+    dprime_mean_by_isi = {
+        isi: float(np.mean(vals)) if vals else np.nan
+        for isi, vals in dprime_per_rep.items()
+    }
+    dprime_std_by_isi = {
+        isi: float(np.std(vals)) if vals else np.nan
+        for isi, vals in dprime_per_rep.items()
+    }
+
+    return {
+        "sigma_value": sigma_value,
+        "sigma_name": sigma_name,
+        "mse_mean": float(np.mean(mse_per_rep)) if mse_per_rep else np.nan,
+        "mse_std": float(np.std(mse_per_rep)) if mse_per_rep else np.nan,
+        "dprime_mean_by_isi": dprime_mean_by_isi,
+        "dprime_std_by_isi": dprime_std_by_isi,
+    }
