@@ -31,6 +31,7 @@ except NameError:
 from utls.toy_experiments import (
     make_toy_experiment_list,
     make_multi_isi_toy_experiments,
+    make_compact_multi_isi_sequences,
     infer_trial_isis,
 )
 
@@ -192,18 +193,29 @@ def fit_sigma_1d(
     metric,
     X0,
     name_to_idx,
-    experiments_by_isi,
-    human_dprimes_by_isi,
-    t_step,
+    experiments_by_isi=None,
+    human_dprimes_by_isi=None,
+    t_step=None,
     n_grid=15,
     n_mc=32,
     n_refine_iters=2,
     spacing="log",
     seed=0,
     verbose=True,
+    # compact multi-ISI sequence parameters (alternative to experiments_by_isi)
+    experiment_list=None,
+    isi_keys=None,
+    target_isis=None,
+    n_seqs_per_rep=10,
 ):
     """
     Fit a single sigma via 1-D grid search with iterative refinement.
+
+    Supports two evaluation modes:
+
+    * **Per-ISI toy experiments** (default): pass ``experiments_by_isi``.
+    * **Compact multi-ISI sequences**: pass ``experiment_list``,
+      ``isi_keys``, and ``target_isis`` instead.
 
     Parameters
     ----------
@@ -215,10 +227,18 @@ def fit_sigma_1d(
         ``(lo, hi)`` search interval.
     fixed_sigmas : dict
         Values of the other (already-fitted or initial) sigmas.
-    experiments_by_isi : dict[int, list[list]]
-        ISI -> list of toy experiment sequences.
+    experiments_by_isi : dict[int, list[list]] or None
+        ISI -> list of toy experiment sequences (per-ISI mode).
     human_dprimes_by_isi : dict[int, float]
         ISI -> target human d'.
+    experiment_list : list[list] or None
+        Multi-ISI experiment sequences (compact mode).
+    isi_keys : list[list[int]] or None
+        ISI label per position for each sequence (compact mode).
+    target_isis : list[int] or None
+        ISI values to evaluate d' for (compact mode).
+    n_seqs_per_rep : int
+        Sequences sampled per MC rep (compact mode only).
     n_grid : int
         Grid points per refinement iteration.
     n_mc : int
@@ -239,6 +259,16 @@ def fit_sigma_1d(
         ``best_sigma``, ``best_mse``, ``best_result``, ``all_results``,
         ``bounds_history``.
     """
+    use_compact = experiment_list is not None
+    if use_compact and experiments_by_isi is not None:
+        raise ValueError(
+            "Provide either experiments_by_isi or experiment_list, not both"
+        )
+    if not use_compact and experiments_by_isi is None:
+        raise ValueError(
+            "Must provide experiments_by_isi or experiment_list"
+        )
+
     lo, hi = sigma_bounds
     all_results = []
     bounds_history = [(lo, hi)]
@@ -261,21 +291,41 @@ def fit_sigma_1d(
         for i in trange(
             len(grid), desc=f"Fitting {sigma_name} (iter {iteration + 1})"
         ):
-            result = evaluate_sigma_on_toy_experiments(
-                run_experiment_fn=run_experiment_fn,
-                sigma_value=grid[i],
-                sigma_name=sigma_name,
-                fixed_sigmas=fixed_sigmas,
-                noise_mode=noise_mode,
-                metric=metric,
-                X0=X0,
-                name_to_idx=name_to_idx,
-                experiments_by_isi=experiments_by_isi,
-                human_dprimes_by_isi=human_dprimes_by_isi,
-                t_step=t_step,
-                n_mc=n_mc,
-                seed=seed + iteration * 100_000 + i,
-            )
+            if use_compact:
+                result = evaluate_sigma_on_multi_isi_sequences(
+                    run_experiment_fn=run_experiment_fn,
+                    sigma_value=grid[i],
+                    sigma_name=sigma_name,
+                    fixed_sigmas=fixed_sigmas,
+                    noise_mode=noise_mode,
+                    metric=metric,
+                    X0=X0,
+                    name_to_idx=name_to_idx,
+                    experiment_list=experiment_list,
+                    isi_keys=isi_keys,
+                    target_isis=target_isis,
+                    human_dprimes_by_isi=human_dprimes_by_isi,
+                    t_step=t_step,
+                    n_seqs_per_rep=n_seqs_per_rep,
+                    n_mc=n_mc,
+                    seed=seed + iteration * 100_000 + i,
+                )
+            else:
+                result = evaluate_sigma_on_toy_experiments(
+                    run_experiment_fn=run_experiment_fn,
+                    sigma_value=grid[i],
+                    sigma_name=sigma_name,
+                    fixed_sigmas=fixed_sigmas,
+                    noise_mode=noise_mode,
+                    metric=metric,
+                    X0=X0,
+                    name_to_idx=name_to_idx,
+                    experiments_by_isi=experiments_by_isi,
+                    human_dprimes_by_isi=human_dprimes_by_isi,
+                    t_step=t_step,
+                    n_mc=n_mc,
+                    seed=seed + iteration * 100_000 + i,
+                )
             iter_results.append(result)
 
         all_results.extend(iter_results)
@@ -347,12 +397,14 @@ def plot_sigma_fit(stage_result, human_dprimes_by_isi=None, title=None):
 
     # ---- right: d' per ISI ----
     ax = axes[1]
+    dp_key = ("dprime_mean_by_isi" if "dprime_mean_by_isi" in results[0]
+              else "dprime_by_isi")
     isi_keys = sorted(
-        {k for r in results for k in r["dprime_by_isi"]},
+        {k for r in results for k in r[dp_key]},
     )
     for isi_val in isi_keys:
         dp = np.array(
-            [r["dprime_by_isi"].get(isi_val, np.nan) for r in results]
+            [r[dp_key].get(isi_val, np.nan) for r in results]
         )
         dp_sorted = dp[order]
         ax.plot(sigma_sorted, dp_sorted, "o-", markersize=3, label=f"ISI={isi_val}")
@@ -408,13 +460,22 @@ def three_stage_fit(
     seed=0,
     verbose=True,
     plot=True,
+    # compact multi-ISI settings for sigma2 (Stage C)
+    use_compact_sigma2=True,
+    compact_length=78,
+    n_compact_sequences=30,
+    compact_min_pairs=5,
+    n_seqs_per_rep=10,
 ):
     """
     Three-stage sequential fitting of sigma0, sigma1, sigma2.
 
     Stage A — fit sigma0 on ISI-0 toy experiments (only sigma0 matters).
     Stage B — fix sigma0, fit sigma1 on ISI 1-4 toy experiments.
-    Stage C — fix sigma0 & sigma1, fit sigma2 on ISI 8-64 toy experiments.
+    Stage C — fix sigma0 & sigma1, fit sigma2 on ISI 8-64 experiments.
+              When *use_compact_sigma2* is True (default), Stage C uses
+              compact multi-ISI sequences (~78 trials each) instead of
+              per-ISI toy experiments (~130 trials each for ISI=64).
 
     Parameters
     ----------
@@ -450,6 +511,17 @@ def three_stage_fit(
         Base random seed.
     verbose, plot : bool
         Print / plot diagnostics.
+    use_compact_sigma2 : bool
+        If True, Stage C uses compact multi-ISI sequences via
+        :func:`~utls.toy_experiments.make_compact_multi_isi_sequences`.
+    compact_length : int
+        Trials per compact sequence (must be divisible by 3).
+    n_compact_sequences : int
+        Total compact sequences to generate (subset sampled per MC rep).
+    compact_min_pairs : int
+        Minimum repeat pairs per ISI per compact sequence.
+    n_seqs_per_rep : int
+        Compact sequences sampled per MC repetition.
 
     Returns
     -------
@@ -575,37 +647,71 @@ def three_stage_fit(
         print(f"STAGE C: Fitting sigma2 (ISIs {isi_sigma2})")
         print("=" * 60)
 
-    sigma2_exps = make_multi_isi_toy_experiments(
-        stimulus_pool,
-        isi_values=isi_sigma2,
-        n_experiments_per_isi=n_experiments_per_isi,
-        k_stimuli=k_stimuli_per_exp,
-        seed=seed + 2_000,
-    )
     sigma2_human = {
         isi: isi_to_human[isi]
         for isi in isi_sigma2
         if isi in isi_to_human
     }
 
-    stage_c = fit_sigma_1d(
-        run_experiment_fn=run_experiment_fn,
-        sigma_name="sigma2",
-        sigma_bounds=param_bounds["sigma2"],
-        fixed_sigmas={"sigma0": sigma0_fitted, "sigma1": sigma1_fitted},
-        noise_mode=noise_mode,
-        metric=metric,
-        X0=X0,
-        name_to_idx=name_to_idx,
-        experiments_by_isi=sigma2_exps,
-        human_dprimes_by_isi=sigma2_human,
-        t_step=t_step,
-        n_grid=n_grid,
-        n_mc=n_mc,
-        n_refine_iters=n_refine_iters,
-        seed=seed + 200_000,
-        verbose=verbose,
-    )
+    if use_compact_sigma2:
+        compact_exps, compact_isi_keys = make_compact_multi_isi_sequences(
+            stimulus_pool=stimulus_pool,
+            isi_values=isi_sigma2,
+            n_sequences=n_compact_sequences,
+            length=compact_length,
+            min_pairs_per_isi=compact_min_pairs,
+            seed=seed + 2_000,
+        )
+        if verbose:
+            print(f"  Using compact multi-ISI sequences: "
+                  f"{len(compact_exps)} seqs x {compact_length} trials")
+        stage_c = fit_sigma_1d(
+            run_experiment_fn=run_experiment_fn,
+            sigma_name="sigma2",
+            sigma_bounds=param_bounds["sigma2"],
+            fixed_sigmas={"sigma0": sigma0_fitted, "sigma1": sigma1_fitted},
+            noise_mode=noise_mode,
+            metric=metric,
+            X0=X0,
+            name_to_idx=name_to_idx,
+            human_dprimes_by_isi=sigma2_human,
+            t_step=t_step,
+            n_grid=n_grid,
+            n_mc=n_mc,
+            n_refine_iters=n_refine_iters,
+            seed=seed + 200_000,
+            verbose=verbose,
+            experiment_list=compact_exps,
+            isi_keys=compact_isi_keys,
+            target_isis=isi_sigma2,
+            n_seqs_per_rep=n_seqs_per_rep,
+        )
+    else:
+        sigma2_exps = make_multi_isi_toy_experiments(
+            stimulus_pool,
+            isi_values=isi_sigma2,
+            n_experiments_per_isi=n_experiments_per_isi,
+            k_stimuli=k_stimuli_per_exp,
+            seed=seed + 2_000,
+        )
+        stage_c = fit_sigma_1d(
+            run_experiment_fn=run_experiment_fn,
+            sigma_name="sigma2",
+            sigma_bounds=param_bounds["sigma2"],
+            fixed_sigmas={"sigma0": sigma0_fitted, "sigma1": sigma1_fitted},
+            noise_mode=noise_mode,
+            metric=metric,
+            X0=X0,
+            name_to_idx=name_to_idx,
+            experiments_by_isi=sigma2_exps,
+            human_dprimes_by_isi=sigma2_human,
+            t_step=t_step,
+            n_grid=n_grid,
+            n_mc=n_mc,
+            n_refine_iters=n_refine_iters,
+            seed=seed + 200_000,
+            verbose=verbose,
+        )
 
     sigma2_fitted = stage_c["best_sigma"]
     if verbose:
