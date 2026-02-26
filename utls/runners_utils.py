@@ -10,6 +10,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.utils import resample
 
 from matplotlib.gridspec import GridSpec
+from pathlib import Path
 
 
 # project-specific paths
@@ -1156,6 +1157,154 @@ def generate_and_plot_model_decay_summary_v5(
 
     return best_fits
 
+
+def generate_and_plot_compact_summary(
+    final_result,
+    human_curve,
+    isis,
+    *,
+    t_step=5,
+    savedir=None,
+    hr_task_name="",
+    encoder_name="",
+):
+    """
+    Compact 2-panel summary for a single fitted run.
+
+    Left panel:
+        d' vs ISI (model vs human) with regime shading.
+    Right panel:
+        Per-ISI MSE bars with overall MSE reference line.
+
+    Returns
+    -------
+    dict
+        ``best_fits``-style dictionary compatible with ``save_best_models``.
+    """
+    human_dp = np.asarray(human_curve, dtype=float)
+    model_dp = compute_model_dprime_for_run(final_result["results"], isis)
+    mse_per_isi = (model_dp - human_dp) ** 2
+
+    params = dict(final_result.get("params", {}))
+    sigma0 = params.get("sigma0", np.nan)
+    sigma1 = params.get("sigma1", np.nan)
+    sigma2 = params.get("sigma2", np.nan)
+
+    mse_all = float(np.mean(mse_per_isi))
+    early_mask = np.asarray([(1 <= isi <= 4) for isi in isis], dtype=bool)
+    late_mask = np.asarray([(isi >= 8) for isi in isis], dtype=bool)
+
+    mse_isi0 = float(mse_per_isi[isis.index(0)]) if 0 in isis else np.nan
+    mse_early = float(np.mean(mse_per_isi[early_mask])) if np.any(early_mask) else np.nan
+    mse_late = float(np.mean(mse_per_isi[late_mask])) if np.any(late_mask) else np.nan
+    nmse = float(compute_nmse(model_dp, human_dp))
+
+    rows = [
+        ("sigma0", sigma0),
+        ("sigma1", sigma1),
+        ("sigma2", sigma2),
+        ("MSE(ISI=0)", mse_isi0),
+        ("MSE(ISI 1-4)", mse_early),
+        ("MSE(ISI 8-64)", mse_late),
+        ("MSE(all)", mse_all),
+    ]
+
+    print("\n" + "=" * 52)
+    print("Compact three-stage fit summary")
+    print("=" * 52)
+    for k, v in rows:
+        print(f"{k:14s}: {v:.6f}" if np.isfinite(v) else f"{k:14s}: nan")
+    print("=" * 52 + "\n")
+
+    x = np.arange(len(isis))
+    fig, (ax_curve, ax_mse) = plt.subplots(1, 2, figsize=(12.5, 4.2))
+
+    def _regime_color(isi):
+        if isi == 0:
+            return "tab:green"
+        if isi < t_step:
+            return "tab:orange"
+        return "tab:purple"
+
+    for i, isi in enumerate(isis):
+        if isi == 0:
+            ax_curve.axvspan(i - 0.5, i + 0.5, color="tab:green", alpha=0.08)
+        elif isi < t_step:
+            ax_curve.axvspan(i - 0.5, i + 0.5, color="tab:orange", alpha=0.08)
+        else:
+            ax_curve.axvspan(i - 0.5, i + 0.5, color="tab:purple", alpha=0.08)
+
+    ax_curve.plot(x, human_dp, "o-k", linewidth=2.3, label="Human")
+    ax_curve.plot(x, model_dp, "s-", color="tab:blue", linewidth=2.0, label="Model")
+    ax_curve.set_xticks(x)
+    ax_curve.set_xticklabels([str(v) for v in isis])
+    ax_curve.set_xlabel("ISI")
+    ax_curve.set_ylabel("d′")
+    ax_curve.set_title("d′ vs ISI")
+    ax_curve.grid(True, alpha=0.25)
+    ax_curve.legend(frameon=False)
+
+    ymax = max(np.nanmax(human_dp), np.nanmax(model_dp))
+    ytxt = ymax + 0.05 * max(1.0, ymax)
+    if 0 in isis:
+        i0 = isis.index(0)
+        ax_curve.text(i0, ytxt, r"$\sigma_0$", ha="center", va="bottom", fontsize=9)
+    sigma1_idx = [i for i, isi in enumerate(isis) if 1 <= isi < t_step]
+    if sigma1_idx:
+        ax_curve.text(np.mean(sigma1_idx), ytxt, r"$\sigma_1$", ha="center", va="bottom", fontsize=9)
+    sigma2_idx = [i for i, isi in enumerate(isis) if isi >= t_step]
+    if sigma2_idx:
+        ax_curve.text(np.mean(sigma2_idx), ytxt, r"$\sigma_2$", ha="center", va="bottom", fontsize=9)
+
+    bar_colors = [_regime_color(isi) for isi in isis]
+    ax_mse.bar(x, mse_per_isi, color=bar_colors, edgecolor="black", linewidth=0.3)
+    ax_mse.axhline(mse_all, color="black", linestyle="--", linewidth=1.2, label=f"Overall={mse_all:.3f}")
+    ax_mse.set_xticks(x)
+    ax_mse.set_xticklabels([str(v) for v in isis])
+    ax_mse.set_xlabel("ISI")
+    ax_mse.set_ylabel("MSE")
+    ax_mse.set_title("Per-ISI MSE")
+    ax_mse.grid(axis="y", alpha=0.25)
+    ax_mse.legend(frameon=False, fontsize=8)
+
+    title = f"{hr_task_name}: compact three-stage fit\n{encoder_name}"
+    fig.suptitle(title, fontsize=12)
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+
+    if savedir:
+        Path(savedir).mkdir(parents=True, exist_ok=True)
+        png_path = Path(savedir) / f"{encoder_name}-compact_summary.png"
+        txt_path = Path(savedir) / f"{encoder_name}-compact_summary.txt"
+        fig.savefig(png_path, dpi=200, bbox_inches="tight")
+        with open(txt_path, "w") as f:
+            f.write("Compact three-stage fit summary\n")
+            f.write("=" * 52 + "\n")
+            for k, v in rows:
+                f.write(f"{k:14s}: {v:.6f}\n" if np.isfinite(v) else f"{k:14s}: nan\n")
+            f.write("=" * 52 + "\n")
+
+    plt.show()
+
+    metric = params.get("metric", "mse_per_isi")
+    noise_mode = params.get("noise_mode", "three-regime")
+    layer = params.get("layer", encoder_name)
+    key = (metric, noise_mode, layer, params.get("t_step", t_step))
+
+    best_fits = {
+        key: {
+            "params": params,
+            "model_dp": np.asarray(model_dp),
+            "mse_per_isi": np.asarray(mse_per_isi),
+            "mse_early": mse_early,
+            "mse_late": mse_late,
+            "nmse": nmse,
+            "score": mse_all,
+            "run_out": final_result["results"],
+        }
+    }
+
+    return best_fits
+
 def plot_noise_schedules(grid_results, max_plots=8):
     """
     Plot std(age) curves for multiple runs.
@@ -1459,7 +1608,6 @@ def plot_best_model_histograms(best_fits, isis, savedir=None, bins=40):
 ## saving
 
 import json, os, numpy as np
-from pathlib import Path
 import pickle
 
 
