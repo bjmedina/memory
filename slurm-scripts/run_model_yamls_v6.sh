@@ -1,0 +1,32 @@
+#!/bin/bash
+#SBATCH -J mem_v6_array
+#SBATCH -p normal
+#SBATCH -t 0-12:00:00
+#SBATCH -n 1
+#SBATCH -c 1
+#SBATCH --mem=20G
+#SBATCH --gres=gpu:1
+#SBATCH --array=0-29
+#SBATCH -o yaml_logs/%x_%A_%a.out
+#SBATCH -e yaml_logs/%x_%A_%a.err
+
+source activate /om2/user/gelbanna/miniconda3/envs/asr312
+cd /om2/user/bjmedina/auditory-memory/memory || exit 1
+
+YAML_DIR=/om2/user/bjmedina/auditory-memory/memory/model_yamls/v15_three-stage-compact
+
+mapfile -t YAMLS < <(ls ${YAML_DIR}/run_*.yaml | sort)
+
+YAML_PATH=${YAMLS[$SLURM_ARRAY_TASK_ID]}
+
+if [[ -z "$YAML_PATH" ]]; then
+  echo "No YAML for task ID $SLURM_ARRAY_TASK_ID"
+  exit 0
+fi
+
+echo "======================================="
+echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
+echo "YAML_PATH = $YAML_PATH"
+echo "======================================="
+
+python /om2/user/bjmedina/auditory-memory/memory/src/model/main_v6.py "$YAML_PATH"
