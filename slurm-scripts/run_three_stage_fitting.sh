@@ -9,7 +9,7 @@
 #SBATCH -o logs/three-stage-compact-fitting_%j.out
 #SBATCH -e logs/three-stage-compact-fitting_%j.err
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=bjmedina@mit.edu
+#SBATCH --mail-user=bryanmaildina@gmail.com
 
 source activate /om2/user/gelbanna/miniconda3/envs/asr312
 cd /om2/user/bjmedina/auditory-memory/memory || exit 1
