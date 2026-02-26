@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH -J sigma2_stability
+#SBATCH -J three-stage-compact-fitting
 #SBATCH -p mcdermott
 #SBATCH -t 0-24:00:00
 #SBATCH -n 1
 #SBATCH -c 4
 #SBATCH --mem=40G
 #SBATCH --gres=gpu:1
-#SBATCH -o logs/sigma2_compact_%j.out
-#SBATCH -e logs/sigma2_compact_%j.err
+#SBATCH -o logs/three-stage-compact-fitting_%j.out
+#SBATCH -e logs/three-stage-compact-fitting_%j.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=bjmedina@mit.edu
 
@@ -19,19 +19,19 @@ cd /om2/user/bjmedina/auditory-memory/memory || exit 1
 
 #2026-02-25_sigma2-compact-sequences.ipynb
 
-NB_IN="notebooks/2026-02-25_sigma2-compact-sequences.ipynb"
+NB_IN="notebooks/2026-02-26_three-stage-compact-fitting.ipynb"
 
 # Timestamp for output naming
 TS="$(date +'%Y-%m-%d_%H%M%S')"
 
 # Make executed notebook name include timestamp
 BASE_IN="$(basename "$NB_IN" .ipynb)"
-NB_OUT="notebooks/${BASE_IN}_executed-${TS}.ipynb"
+NB_OUT="notebooks/executed/${BASE_IN}-${TS}.ipynb"
 
 echo "Will save to: $NB_OUT"
 
 
-echo "=== Running sigma2 stability notebook ==="
+echo "=== Running three-stage-compact-fitting notebook ==="
 echo "Start: $(date)"
 
 jupyter nbconvert --to notebook --execute \
