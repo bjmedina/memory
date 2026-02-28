@@ -67,7 +67,7 @@ def make_grid(lo, hi, n, spacing="log"):
 
 
 def auc_to_dprime(auc_val, eps=1e-6):
-    """Convert AUC to d' via the equal-variance Gaussian model."""
+    """Convert AUC to d'"""
     auc_val = np.clip(auc_val, eps, 1 - eps)
     return float(np.sqrt(2) * norm.ppf(auc_val))
 
