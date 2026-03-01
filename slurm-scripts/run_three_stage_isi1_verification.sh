@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J three-stage-isi1-verification
 #SBATCH -p mcdermott
-#SBATCH -t 0-12:00:00
+#SBATCH -t 1-12:00:00
 #SBATCH -n 1
 #SBATCH -c 4
 #SBATCH --mem=40G
