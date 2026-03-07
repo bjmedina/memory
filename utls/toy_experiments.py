@@ -198,6 +198,57 @@ def infer_trial_isis(sequence):
             first_seen[stim] = i
     return trial_isis
 
+def make_high_diversity_sequences(
+    stimulus_pool, isi_values, n_sequences, length, min_pairs_per_isi=5, seed=42,
+):
+    """Like make_compact_multi_isi_sequences but each sequence draws from a
+    DIFFERENT slice of the full stimulus pool (no overlap between seqs)."""
+    isi_values = list(isi_values)
+    isi_conditions = [-1] + isi_values
+    unique_per_seq = length // 3 * 2  # stimuli needed per sequence
+    total_needed = unique_per_seq * n_sequences
+
+    if len(stimulus_pool) < total_needed:
+        print(f"WARNING: pool ({len(stimulus_pool)}) < needed ({total_needed}), "
+              f"some overlap will occur")
+
+    # Stage 1: generate ISI patterns (same as original)
+    isi_seq = ISISequence(length=length, isi_values=isi_conditions, seed=seed)
+    isi_seq.generate_n(n=n_sequences, min_pairs_per_isi=min_pairs_per_isi)
+
+    # Stage 2: assign DIFFERENT stimuli to each sequence
+    rng = random.Random(seed + 99)
+    pool = list(stimulus_pool)
+    rng.shuffle(pool)
+
+    experiment_list = []
+    isi_keys = []
+
+    for j in range(n_sequences):
+        seq, pairs = isi_seq.get_sequence_and_isi_pairings(j)
+
+        # Each sequence gets its own slice of the pool
+        start = (j * unique_per_seq) % len(pool)
+        end = start + unique_per_seq
+        if end <= len(pool):
+            seq_pool = pool[start:end]
+        else:
+            # Wrap around
+            seq_pool = pool[start:] + pool[:end - len(pool)]
+
+        # Use StimulusManager for a single sequence with this unique pool
+        sm = StimulusManager(
+            stimulus_ids=seq_pool,
+            isi_values=isi_conditions,
+            length=length,
+            seed=seed + j * 1000,
+            shuffle=True,
+        )
+        sm.get_assignments_from_pairs(pairs, seq=seq)
+        experiment_list.append(sm.assignments[0])
+        isi_keys.append(sm.seqs[0])
+
+    return experiment_list, isi_keys
 
 def make_compact_multi_isi_sequences(
     stimulus_pool,

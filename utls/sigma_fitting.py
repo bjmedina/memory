@@ -35,6 +35,8 @@ from utls.toy_experiments import (
     infer_trial_isis,
 )
 
+from utls.analysis_helpers import auroc_to_dprime
+
 
 # ── helpers ──────────────────────────────────────────────────────────
 
@@ -181,6 +183,134 @@ def evaluate_sigma_on_toy_experiments(
         "auc_by_isi": auc_by_isi,
     }
 
+def evaluate_sigma_on_toy_experiments_sample(
+    run_experiment_fn,
+    sigma_value,
+    sigma_name,
+    fixed_sigmas,
+    noise_mode,
+    metric,
+    X0,
+    name_to_idx,
+    experiments_by_isi,
+    human_dprimes_by_isi,
+    t_step,
+    n_mc=32,
+    seed=0,
+):
+    """
+    Evaluate one sigma candidate on toy experiments across ISI conditions.
+
+    Parameters
+    ----------
+    run_experiment_fn : callable
+        ``run_experiment_scores`` from ``utls.runners_v2``.
+    sigma_value : float
+        Value of the sigma being evaluated.
+    sigma_name : str
+        Which sigma (``"sigma0"``, ``"sigma1"``, or ``"sigma2"``).
+    fixed_sigmas : dict
+        Fixed sigma values, e.g. ``{"sigma0": 5.0, "sigma2": 0.1}``.
+    noise_mode, metric, X0, name_to_idx, t_step :
+        Forwarded to *run_experiment_fn*.
+    experiments_by_isi : dict[int, list[list]]
+        ISI -> list of experiment sequences.
+    human_dprimes_by_isi : dict[int, float]
+        ISI -> human d' at that ISI.
+    n_mc : int
+        Monte-Carlo repetitions per experiment batch.
+    seed : int
+        Base random seed.
+
+    Returns
+    -------
+    dict
+        ``sigma_value``, ``dprime_by_isi``, ``mse_by_isi``, ``mse_mean``,
+        ``auc_by_isi``.
+    """
+    sigmas = dict(fixed_sigmas)
+    sigmas[sigma_name] = sigma_value
+
+    dprime_by_isi = {}
+    mse_by_isi = {}
+    auc_by_isi = {}
+
+    for isi_val, exp_list in experiments_by_isi.items():
+        all_hits, all_fas = [], []
+
+        for rep in range(n_mc):
+            run_out = run_experiment_fn(
+                sigma0=sigmas["sigma0"],
+                sigma1=sigmas.get("sigma1", 0.0),
+                sigma2=sigmas.get("sigma2", 0.0),
+                t_step=t_step,
+                rate=0,
+                noise_mode=noise_mode,
+                metric=metric,
+                X0=X0,
+                name_to_idx=name_to_idx,
+                experiment_list=exp_list,
+                debug=False,
+                seed=seed * 10_000 + isi_val * 1000 + rep,
+            )
+            all_hits.extend(run_out["hits"])
+            all_fas.extend(run_out["fas"])
+
+        if len(all_hits) == 0 or len(all_fas) == 0:
+            dprime_by_isi[isi_val] = np.nan
+            mse_by_isi[isi_val] = np.nan
+            auc_by_isi[isi_val] = np.nan
+            continue
+
+        ##############################
+        target_fpr = np.array([0.001, 0.0001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 0.99], dtype=float)
+
+        y_true = np.concatenate([np.ones(len(all_hits)), np.zeros(len(all_fas))])
+        scores = np.concatenate([all_hits, all_fas])
+
+        ## UPDATED d' calculation using the sampeld ROC curve
+        # --- ROC for "smaller score = more signal" ---
+        P = (y_true == 1).sum()
+        N = (y_true == 0).sum()
+        
+        thr = np.unique(np.sort(scores))  # candidate thresholds (low -> high)
+        tpr = np.array([(scores[y_true==1] <= t).sum()/P for t in thr])
+        fpr = np.array([(scores[y_true==0] <= t).sum()/N for t in thr])
+        
+        # keep one point per desired FAR by choosing the closest available FAR
+        idx = np.array([np.argmin(np.abs(fpr - f)) for f in target_fpr])
+        idx = np.unique(idx)  # drop duplicates (can happen when data is coarse)
+        
+        fpr_s = fpr[idx]
+        tpr_s = tpr[idx]
+        
+        # AUROC over these sampled points (sort by FPR first)
+        order = np.argsort(fpr_s)
+        ##############################
+
+        auroc = np.trapz(tpr_s[order], fpr_s[order])
+        dprime = auroc_to_dprime(auroc)
+
+        dprime_by_isi[isi_val] = dprime
+        auc_by_isi[isi_val] = auroc
+
+        if isi_val in human_dprimes_by_isi:
+            mse_by_isi[isi_val] = (dprime - human_dprimes_by_isi[isi_val]) ** 2
+        else:
+            mse_by_isi[isi_val] = np.nan
+
+    finite_mse = [v for v in mse_by_isi.values() if np.isfinite(v)]
+    mse_mean = float(np.mean(finite_mse)) if finite_mse else np.nan
+
+    return {
+        "sigma_value": sigma_value,
+        "sigma_name": sigma_name,
+        "dprime_by_isi": dprime_by_isi,
+        "mse_by_isi": mse_by_isi,
+        "mse_mean": mse_mean,
+        "auc_by_isi": auc_by_isi,
+    }
+
 
 # ── 1-D grid search with refinement ─────────────────────────────────
 
@@ -292,7 +422,9 @@ def fit_sigma_1d(
             len(grid), desc=f"Fitting {sigma_name} (iter {iteration + 1})"
         ):
             if use_compact:
-                result = evaluate_sigma_on_multi_isi_sequences(
+                if verbose:
+                    print("evaluate_sigma_on_multi_isi_sequences_sample")
+                result = evaluate_sigma_on_multi_isi_sequences_sample(
                     run_experiment_fn=run_experiment_fn,
                     sigma_value=grid[i],
                     sigma_name=sigma_name,
@@ -311,7 +443,9 @@ def fit_sigma_1d(
                     seed=seed + iteration * 100_000 + i,
                 )
             else:
-                result = evaluate_sigma_on_toy_experiments(
+                if verbose:
+                    print("evaluate_sigma_on_multi_isi_sequences_sample")
+                result = evaluate_sigma_on_toy_experiments_sample(
                     run_experiment_fn=run_experiment_fn,
                     sigma_value=grid[i],
                     sigma_name=sigma_name,
@@ -868,6 +1002,184 @@ def load_three_stage_result(pkl_path):
 
 # ── multi-ISI sequence evaluation ────────────────────────────────────
 
+def evaluate_sigma_on_multi_isi_sequences_sample(
+    run_experiment_fn,
+    sigma_value,
+    sigma_name,
+    fixed_sigmas,
+    noise_mode,
+    metric,
+    X0,
+    name_to_idx,
+    experiment_list,
+    isi_keys,
+    target_isis,
+    human_dprimes_by_isi,
+    t_step,
+    n_seqs_per_rep=10,
+    n_mc=32,
+    seed=0,
+):
+    """
+    Evaluate one sigma candidate on compact multi-ISI sequences.
+
+    Unlike :func:`evaluate_sigma_on_toy_experiments` (which expects each
+    experiment to contain a single ISI), this function handles sequences
+    that contain repeat pairs at *multiple* ISI values.  For each MC rep
+    it samples a subset of sequences, runs the model, and splits hits by
+    ISI using :func:`~utls.toy_experiments.infer_trial_isis`.
+
+    Parameters
+    ----------
+    run_experiment_fn : callable
+        ``run_experiment_scores`` from ``utls.runners_v2``.
+    sigma_value : float
+        Value of the sigma being evaluated.
+    sigma_name : str
+        Which sigma (``"sigma0"``, ``"sigma1"``, or ``"sigma2"``).
+    fixed_sigmas : dict
+        Values of the other (already-fitted) sigmas.
+    noise_mode, metric, X0, name_to_idx, t_step :
+        Forwarded to *run_experiment_fn*.
+    experiment_list : list[list]
+        Multi-ISI experiment sequences (stimulus file paths).
+    isi_keys : list[list[int]]
+        ISI label per position for each sequence.
+    target_isis : list[int]
+        ISI values to compute d' for (e.g. ``[8, 16, 32, 64]``).
+    human_dprimes_by_isi : dict[int, float]
+        ISI -> target human d'.
+    n_seqs_per_rep : int
+        Sequences sampled (without replacement) per MC repetition.
+    n_mc : int
+        Monte-Carlo repetitions.
+    seed : int
+        Base random seed.
+
+    Returns
+    -------
+    dict
+        ``sigma_value``, ``mse_mean``, ``mse_std``,
+        ``dprime_mean_by_isi``, ``dprime_std_by_isi``.
+    """
+    sigmas = dict(fixed_sigmas)
+    sigmas[sigma_name] = sigma_value
+
+    # Pre-compute trial ISIs for each sequence
+    seq_trial_isis = [infer_trial_isis(seq) for seq in experiment_list]
+
+    mse_per_rep = []
+    dprime_per_rep = {isi: [] for isi in target_isis}
+
+    for rep in range(n_mc):
+        rng = np.random.default_rng(seed + rep)
+        n_sample = min(n_seqs_per_rep, len(experiment_list))
+        seq_indices = rng.choice(
+            len(experiment_list), size=n_sample, replace=False
+        )
+
+        all_hits, all_isis_for_hits, all_fas = [], [], []
+        for si in seq_indices:
+            seq = experiment_list[si]
+            t_isis = seq_trial_isis[si]
+            run_out = run_experiment_fn(
+                sigma0=sigmas["sigma0"],
+                sigma1=sigmas.get("sigma1", 0.0),
+                sigma2=sigmas.get("sigma2", 0.0),
+                t_step=t_step,
+                rate=0,
+                noise_mode=noise_mode,
+                metric=metric,
+                X0=X0,
+                name_to_idx=name_to_idx,
+                experiment_list=[seq],
+                debug=False,
+                seed=seed + rep * 1000 + int(si),
+            )
+            h = np.asarray(run_out["hits"])
+            f = np.asarray(run_out["fas"])
+            if len(h) != len(t_isis):
+                continue
+            all_hits.append(h)
+            all_isis_for_hits.extend(t_isis)
+            all_fas.append(f)
+
+        if not all_hits:
+            continue
+        hits_arr = np.concatenate(all_hits)
+        isis_arr = np.array(all_isis_for_hits)
+        fas_arr = np.concatenate(all_fas) if all_fas else np.array([])
+        if len(fas_arr) == 0:
+            continue
+
+        rep_mse = []
+        for isi_val in target_isis:
+            mask = isis_arr == isi_val
+            hits_isi = hits_arr[mask]
+            
+            if len(hits_isi) == 0:
+                continue
+                
+            human_dp = human_dprimes_by_isi.get(isi_val)
+            
+            if human_dp is None:
+                continue
+            
+            # dp = auc_to_dprime(
+            #     roc_auc_score(y, -np.concatenate([hits_isi, fas_arr]))
+            # )
+            
+            ##############################
+            target_fpr = np.array([0.001, 0.0001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 0.99], dtype=float)
+    
+            y_true = np.concatenate([np.ones(len(hits_isi)), np.zeros(len(fas_arr))])
+            scores = np.concatenate([hits_isi, fas_arr])
+    
+            ## UPDATED d' calculation using the sampeld ROC curve
+            # --- ROC for "smaller score = more signal" ---
+            P = (y_true == 1).sum()
+            N = (y_true == 0).sum()
+            
+            thr = np.unique(np.sort(scores))  # candidate thresholds (low -> high)
+            tpr = np.array([(scores[y_true==1] <= t).sum()/P for t in thr])
+            fpr = np.array([(scores[y_true==0] <= t).sum()/N for t in thr])
+            
+            # keep one point per desired FAR by choosing the closest available FAR
+            idx = np.array([np.argmin(np.abs(fpr - f)) for f in target_fpr])
+            idx = np.unique(idx)  # drop duplicates (can happen when data is coarse)
+            
+            fpr_s = fpr[idx]
+            tpr_s = tpr[idx]
+            
+            # AUROC over these sampled points (sort by FPR first)
+            order = np.argsort(fpr_s)
+            auroc = np.trapz(tpr_s[order], fpr_s[order])
+            dp    = auroc_to_dprime(auroc)
+            ##############################
+            
+            rep_mse.append((dp - human_dp) ** 2)
+            dprime_per_rep[isi_val].append(dp)
+
+        if rep_mse:
+            mse_per_rep.append(np.mean(rep_mse))
+
+    dprime_mean_by_isi = {
+        isi: float(np.mean(vals)) if vals else np.nan
+        for isi, vals in dprime_per_rep.items()
+    }
+    dprime_std_by_isi = {
+        isi: float(np.std(vals)) if vals else np.nan
+        for isi, vals in dprime_per_rep.items()
+    }
+
+    return {
+        "sigma_value": sigma_value,
+        "sigma_name": sigma_name,
+        "mse_mean": float(np.mean(mse_per_rep)) if mse_per_rep else np.nan,
+        "mse_std": float(np.std(mse_per_rep)) if mse_per_rep else np.nan,
+        "dprime_mean_by_isi": dprime_mean_by_isi,
+        "dprime_std_by_isi": dprime_std_by_isi,
+    }
 
 def evaluate_sigma_on_multi_isi_sequences(
     run_experiment_fn,
