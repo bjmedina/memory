@@ -74,6 +74,40 @@ def auc_to_dprime(auc_val, eps=1e-6):
     return float(np.sqrt(2) * norm.ppf(auc_val))
 
 
+def compute_auroc_sparse12(hits, fas):
+    """Compute AUROC using sparse 12-point sampled ROC.
+
+    Builds the full ROC curve (lower score = more signal), then samples
+    at 12 target FPR values using nearest-match, deduplicates, sorts,
+    and integrates via trapz.
+
+    This method produces smoother (less variable) d' vs sigma curves,
+    especially for ISI=1 where the upper-envelope method shows a
+    non-monotonic bump due to fine ROC structure.
+    """
+    hits = np.asarray(hits, dtype=float)
+    fas = np.asarray(fas, dtype=float)
+    P, N = len(hits), len(fas)
+    if P == 0 or N == 0:
+        return np.nan
+
+    scores = np.concatenate([hits, fas])
+    y_true = np.concatenate([np.ones(P), np.zeros(N)])
+
+    thr = np.unique(np.sort(scores))
+    tpr = np.array([(scores[y_true == 1] <= t).sum() / P for t in thr])
+    fpr = np.array([(scores[y_true == 0] <= t).sum() / N for t in thr])
+
+    target_fpr = np.array(
+        [0.001, 0.0001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 0.99],
+        dtype=float,
+    )
+    idx = np.unique([np.argmin(np.abs(fpr - f)) for f in target_fpr])
+    fpr_s, tpr_s = fpr[idx], tpr[idx]
+    order = np.argsort(fpr_s)
+    return float(np.trapz(tpr_s[order], fpr_s[order]))
+
+
 def _compute_auroc_upper_envelope(hits, fas, n_interp=1000):
     """Compute AUROC using upper-envelope ROC with dense interpolation.
 
@@ -238,6 +272,7 @@ def evaluate_sigma_on_toy_experiments_sample(
     t_step,
     n_mc=32,
     seed=0,
+    auroc_fn=None,
 ):
     """
     Evaluate one sigma candidate on toy experiments across ISI conditions.
@@ -269,6 +304,9 @@ def evaluate_sigma_on_toy_experiments_sample(
         ``sigma_value``, ``dprime_by_isi``, ``mse_by_isi``, ``mse_mean``,
         ``auc_by_isi``.
     """
+    if auroc_fn is None:
+        auroc_fn = _compute_auroc_upper_envelope
+
     sigmas = dict(fixed_sigmas)
     sigmas[sigma_name] = sigma_value
 
@@ -303,7 +341,7 @@ def evaluate_sigma_on_toy_experiments_sample(
             auc_by_isi[isi_val] = np.nan
             continue
 
-        auroc = _compute_auroc_upper_envelope(all_hits, all_fas)
+        auroc = auroc_fn(all_hits, all_fas)
         dprime = auc_to_dprime(auroc, eps=1e-4)
 
         dprime_by_isi[isi_val] = dprime
@@ -352,6 +390,7 @@ def fit_sigma_1d(
     isi_keys=None,
     target_isis=None,
     n_seqs_per_rep=10,
+    auroc_fn=None,
 ):
     """
     Fit a single sigma via 1-D grid search with iterative refinement.
@@ -456,6 +495,7 @@ def fit_sigma_1d(
                     n_seqs_per_rep=n_seqs_per_rep,
                     n_mc=n_mc,
                     seed=seed + iteration * 100_000 + i,
+                    auroc_fn=auroc_fn,
                 )
             else:
                 if verbose:
@@ -474,6 +514,7 @@ def fit_sigma_1d(
                     t_step=t_step,
                     n_mc=n_mc,
                     seed=seed + iteration * 100_000 + i,
+                    auroc_fn=auroc_fn,
                 )
             iter_results.append(result)
 
@@ -1034,6 +1075,7 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
     n_seqs_per_rep=10,
     n_mc=32,
     seed=0,
+    auroc_fn=None,
 ):
     """
     Evaluate one sigma candidate on compact multi-ISI sequences.
@@ -1070,6 +1112,9 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
         Monte-Carlo repetitions.
     seed : int
         Base random seed.
+    auroc_fn : callable or None
+        AUROC computation function ``(hits, fas) -> float``.
+        Defaults to :func:`_compute_auroc_upper_envelope`.
 
     Returns
     -------
@@ -1077,6 +1122,9 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
         ``sigma_value``, ``mse_mean``, ``mse_std``,
         ``dprime_mean_by_isi``, ``dprime_std_by_isi``.
     """
+    if auroc_fn is None:
+        auroc_fn = _compute_auroc_upper_envelope
+
     sigmas = dict(fixed_sigmas)
     sigmas[sigma_name] = sigma_value
 
@@ -1140,9 +1188,9 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
             if human_dp is None:
                 continue
             
-            auroc = _compute_auroc_upper_envelope(hits_isi, fas_arr)
+            auroc = auroc_fn(hits_isi, fas_arr)
             dp = auc_to_dprime(auroc, eps=1e-4)
-            
+
             rep_mse.append((dp - human_dp) ** 2)
             dprime_per_rep[isi_val].append(dp)
 
