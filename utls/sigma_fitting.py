@@ -74,6 +74,47 @@ def auc_to_dprime(auc_val, eps=1e-6):
     return float(np.sqrt(2) * norm.ppf(auc_val))
 
 
+def _compute_auroc_upper_envelope(hits, fas, n_interp=1000):
+    """Compute AUROC using upper-envelope ROC with dense interpolation.
+
+    Builds the full ROC curve (lower score = more signal), takes the
+    upper envelope (max TPR per unique FPR), anchors at (0,0) and (1,1),
+    then interpolates onto a dense uniform FPR grid before integrating.
+
+    This produces much more stable AUROC/d' estimates than the previous
+    sparse 12-point sampled-ROC approach.
+    """
+    hits = np.asarray(hits, dtype=float)
+    fas = np.asarray(fas, dtype=float)
+    P, N = len(hits), len(fas)
+    if P == 0 or N == 0:
+        return np.nan
+
+    scores = np.concatenate([hits, fas])
+    y_true = np.concatenate([np.ones(P), np.zeros(N)])
+
+    thr = np.unique(np.sort(scores))
+    tpr = np.array([(scores[y_true == 1] <= t).sum() / P for t in thr])
+    fpr = np.array([(scores[y_true == 0] <= t).sum() / N for t in thr])
+
+    # Upper-envelope: for each unique FPR, retain max TPR
+    unique_fpr = np.unique(fpr)
+    max_tpr = np.array([tpr[fpr == f].max() for f in unique_fpr])
+
+    # Anchor at (0,0) and (1,1)
+    if unique_fpr[0] > 0:
+        unique_fpr = np.concatenate([[0.0], unique_fpr])
+        max_tpr = np.concatenate([[0.0], max_tpr])
+    if unique_fpr[-1] < 1:
+        unique_fpr = np.concatenate([unique_fpr, [1.0]])
+        max_tpr = np.concatenate([max_tpr, [1.0]])
+
+    # Dense uniform interpolation
+    target_fpr = np.linspace(0, 1, n_interp)
+    tpr_s = np.interp(target_fpr, unique_fpr, max_tpr)
+    return float(np.trapz(tpr_s, target_fpr))
+
+
 # ── core evaluation ──────────────────────────────────────────────────
 
 def evaluate_sigma_on_toy_experiments(
@@ -262,34 +303,8 @@ def evaluate_sigma_on_toy_experiments_sample(
             auc_by_isi[isi_val] = np.nan
             continue
 
-        ##############################
-        target_fpr = np.array([0.001, 0.0001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 0.99], dtype=float)
-
-        y_true = np.concatenate([np.ones(len(all_hits)), np.zeros(len(all_fas))])
-        scores = np.concatenate([all_hits, all_fas])
-
-        ## UPDATED d' calculation using the sampeld ROC curve
-        # --- ROC for "smaller score = more signal" ---
-        P = (y_true == 1).sum()
-        N = (y_true == 0).sum()
-        
-        thr = np.unique(np.sort(scores))  # candidate thresholds (low -> high)
-        tpr = np.array([(scores[y_true==1] <= t).sum()/P for t in thr])
-        fpr = np.array([(scores[y_true==0] <= t).sum()/N for t in thr])
-        
-        # keep one point per desired FAR by choosing the closest available FAR
-        idx = np.array([np.argmin(np.abs(fpr - f)) for f in target_fpr])
-        idx = np.unique(idx)  # drop duplicates (can happen when data is coarse)
-        
-        fpr_s = fpr[idx]
-        tpr_s = tpr[idx]
-        
-        # AUROC over these sampled points (sort by FPR first)
-        order = np.argsort(fpr_s)
-        ##############################
-
-        auroc = np.trapz(tpr_s[order], fpr_s[order])
-        dprime = auroc_to_dprime(auroc)
+        auroc = _compute_auroc_upper_envelope(all_hits, all_fas)
+        dprime = auc_to_dprime(auroc, eps=1e-4)
 
         dprime_by_isi[isi_val] = dprime
         auc_by_isi[isi_val] = auroc
@@ -1125,37 +1140,8 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
             if human_dp is None:
                 continue
             
-            # dp = auc_to_dprime(
-            #     roc_auc_score(y, -np.concatenate([hits_isi, fas_arr]))
-            # )
-            
-            ##############################
-            target_fpr = np.array([0.001, 0.0001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 0.99], dtype=float)
-    
-            y_true = np.concatenate([np.ones(len(hits_isi)), np.zeros(len(fas_arr))])
-            scores = np.concatenate([hits_isi, fas_arr])
-    
-            ## UPDATED d' calculation using the sampeld ROC curve
-            # --- ROC for "smaller score = more signal" ---
-            P = (y_true == 1).sum()
-            N = (y_true == 0).sum()
-            
-            thr = np.unique(np.sort(scores))  # candidate thresholds (low -> high)
-            tpr = np.array([(scores[y_true==1] <= t).sum()/P for t in thr])
-            fpr = np.array([(scores[y_true==0] <= t).sum()/N for t in thr])
-            
-            # keep one point per desired FAR by choosing the closest available FAR
-            idx = np.array([np.argmin(np.abs(fpr - f)) for f in target_fpr])
-            idx = np.unique(idx)  # drop duplicates (can happen when data is coarse)
-            
-            fpr_s = fpr[idx]
-            tpr_s = tpr[idx]
-            
-            # AUROC over these sampled points (sort by FPR first)
-            order = np.argsort(fpr_s)
-            auroc = np.trapz(tpr_s[order], fpr_s[order])
-            dp    = auroc_to_dprime(auroc)
-            ##############################
+            auroc = _compute_auroc_upper_envelope(hits_isi, fas_arr)
+            dp = auc_to_dprime(auroc, eps=1e-4)
             
             rep_mse.append((dp - human_dp) ** 2)
             dprime_per_rep[isi_val].append(dp)
