@@ -74,12 +74,20 @@ def auc_to_dprime(auc_val, eps=1e-6):
     return float(np.sqrt(2) * norm.ppf(auc_val))
 
 
-def compute_auroc_sparse12(hits, fas):
-    """Compute AUROC using sparse 12-point sampled ROC.
+def compute_auroc_sparse(hits, fas, n_points=12):
+    """Compute AUROC using sparse sampled ROC with (0,0) and (1,1) anchoring.
 
-    Builds the full ROC curve (lower score = more signal), then samples
-    at 12 target FPR values using nearest-match, deduplicates, sorts,
-    and integrates via trapz.
+    Builds the full ROC curve (lower score = more signal), samples at
+    *n_points* uniformly-spaced target FPR values using nearest-match,
+    anchors at (0,0) and (1,1), deduplicates, sorts, and integrates
+    via trapz.
+
+    Parameters
+    ----------
+    hits, fas : array-like
+        Hit and false-alarm score arrays.
+    n_points : int
+        Number of interior FPR sampling points (default 12).
 
     This method produces smoother (less variable) d' vs sigma curves,
     especially for ISI=1 where the upper-envelope method shows a
@@ -98,14 +106,37 @@ def compute_auroc_sparse12(hits, fas):
     tpr = np.array([(scores[y_true == 1] <= t).sum() / P for t in thr])
     fpr = np.array([(scores[y_true == 0] <= t).sum() / N for t in thr])
 
-    target_fpr = np.array(
-        [0.001, 0.0001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 0.99],
-        dtype=float,
-    )
+    # Sample at n_points uniformly-spaced FPR targets (excluding 0 and 1)
+    target_fpr = np.linspace(0, 1, n_points + 2)[1:-1]
     idx = np.unique([np.argmin(np.abs(fpr - f)) for f in target_fpr])
     fpr_s, tpr_s = fpr[idx], tpr[idx]
+
+    # Anchor at (0,0) and (1,1)
+    fpr_s = np.concatenate([[0.0], fpr_s, [1.0]])
+    tpr_s = np.concatenate([[0.0], tpr_s, [1.0]])
+
     order = np.argsort(fpr_s)
-    return float(np.trapz(tpr_s[order], fpr_s[order]))
+    # Deduplicate after sorting (keep last occurrence for max TPR at each FPR)
+    fpr_sorted = fpr_s[order]
+    tpr_sorted = tpr_s[order]
+    _, unique_idx = np.unique(fpr_sorted, return_index=True)
+    # For duplicate FPRs, keep the one with the highest TPR
+    final_fpr, final_tpr = [], []
+    for uidx in unique_idx:
+        mask = fpr_sorted == fpr_sorted[uidx]
+        final_fpr.append(fpr_sorted[uidx])
+        final_tpr.append(tpr_sorted[mask].max())
+
+    return float(np.trapz(final_tpr, final_fpr))
+
+
+def compute_auroc_sparse12(hits, fas):
+    """Compute AUROC using sparse 12-point sampled ROC.
+
+    Convenience wrapper around :func:`compute_auroc_sparse` with
+    ``n_points=12``.
+    """
+    return compute_auroc_sparse(hits, fas, n_points=12)
 
 
 def _compute_auroc_upper_envelope(hits, fas, n_interp=1000):
