@@ -1086,3 +1086,210 @@ def run_experiment_grid(
         })
 
     return results_all
+
+
+# ── Prior-aware simulation engine ────────────────────────────────────
+
+def filter_kwargs_for_core_prior(kwargs):
+    """Remove parameters that run_model_core_prior does not accept."""
+    allowed = {
+        "sigma0", "X0", "name_to_idx", "experiment_list",
+        "metric", "noise_schedule",
+        "return_item_scores", "return_binary_matrix",
+        "decision_threshold", "debug", "seed",
+        "score_model", "drift_step_size",
+    }
+    return {k: v for k, v in kwargs.items() if k in allowed}
+
+
+def run_model_core_prior(
+    sigma0,
+    *,
+    X0,
+    name_to_idx,
+    experiment_list,
+    score_model,
+    drift_step_size=0.0,
+    metric="mahalanobis",
+    noise_schedule=None,
+    return_item_scores=False,
+    return_binary_matrix=False,
+    decision_threshold=None,
+    debug=False,
+    torch_rng=None,
+    seed=0,
+):
+    """
+    Memory-model simulation with prior-driven drift.
+
+    Identical to run_model_core except that, at each trial, every stored
+    memory trace receives an additional drift step toward high-prior
+    regions via the score function (gradient of log-prior).
+
+    Extra parameters
+    ----------------
+    score_model : ScoreFunction
+        Provides ``.forward(x)`` returning unit-norm ∇ log π(x).
+    drift_step_size : float
+        Magnitude of prior-driven drift applied each trial.
+    """
+
+    if torch_rng is None:
+        torch_rng = torch.Generator(device=X0.device)
+        torch_rng.manual_seed(seed)
+
+    idx_to_name = {v: k for k, v in name_to_idx.items()}
+    D = X0.shape[1]
+
+    dim_std = X0.std(0, unbiased=True)
+    rms_std = torch.sqrt(torch.mean(dim_std ** 2))
+    scaled_std = dim_std / rms_std
+
+    hit_scores, fa_scores = [], []
+    isi_hit_dists = defaultdict(list)
+    T_max = max((len(seq) for seq in experiment_list), default=0)
+    fa_by_t = [[] for _ in range(T_max)]
+
+    item_hits, item_fas = defaultdict(list), defaultdict(list)
+    binary_hits, binary_fas = [], []
+
+    stds_over_time = []
+    all_fnames = sorted(name_to_idx.keys())
+
+    for seq in experiment_list:
+        if not seq:
+            continue
+
+        seq_idx = [name_to_idx[f] for f in seq]
+        memory_bank, seen, last_seen = [], set(), {}
+
+        if return_binary_matrix:
+            row_hits = {os.path.basename(f): np.nan for f in all_fnames}
+            row_fas  = {os.path.basename(f): np.nan for f in all_fnames}
+
+        for t, incoming in enumerate(seq_idx, start=1):
+            probe = X0[incoming].view(1, -1)
+            fname = idx_to_name[incoming]
+            scores = []
+
+            # ------------------ UPDATE MEMORIES ------------------
+            for mem in memory_bank:
+                age = t - mem["t_inserted"]
+
+                std = noise_schedule(age)
+                stds_over_time.append((age, std))
+
+                # random noise
+                noise = torch.randn(
+                    mem["mu"].shape,
+                    device=mem["mu"].device,
+                    dtype=mem["mu"].dtype,
+                    generator=torch_rng,
+                ) * (std * scaled_std)
+
+                mem["mu"] += noise
+
+                # prior-driven drift
+                if drift_step_size > 0:
+                    with torch.no_grad():
+                        drift = score_model.forward(mem["mu"])
+                    mem["mu"] += drift_step_size * drift.view_as(mem["mu"])
+
+                # score
+                score = compute_score(probe, mem["mu"], std, metric)
+                scores.append(score)
+
+            # ------------------ DECISION STEP ------------------
+            if scores:
+                score_val = max(scores) if metric == "loglikelihood" else min(scores)
+                if debug:
+                    print(f"[ BEST SCORE ]: {score_val}")
+                is_repeat = incoming in seen
+
+                if not return_item_scores and not return_binary_matrix:
+                    if is_repeat:
+                        hit_scores.append(score_val)
+                        isi = t - last_seen[incoming]
+                        isi_hit_dists[isi].append((score_val, t))
+                    else:
+                        fa_scores.append(score_val)
+                        fa_by_t[t - 1].append(score_val)
+
+                if return_item_scores and not return_binary_matrix:
+                    if is_repeat:
+                        isi = t - last_seen[incoming]
+                        if isi > 1:
+                            item_hits[fname].append(score_val)
+                    else:
+                        item_fas[fname].append(score_val)
+
+                if return_binary_matrix:
+                    if decision_threshold is not None:
+                        yes = 1 if score_val <= decision_threshold else 0
+                    else:
+                        yes = 1 if is_repeat else 0
+
+                    if is_repeat:
+                        row_hits[os.path.basename(fname)] = yes
+                    else:
+                        row_fas[os.path.basename(fname)] = yes
+
+            # ------------------ STORE NEW MEMORY ------------------
+            base = X0[incoming].clone()
+            noise = torch.randn(
+                base.shape,
+                device=base.device,
+                dtype=base.dtype,
+                generator=torch_rng,
+            )
+            if debug:
+                print("noise, sigma0")
+                print(torch.sum(noise), sigma0)
+            mem = base + noise * (sigma0 * dim_std)
+            memory_bank.append({"mu": mem.view(1, -1), "t_inserted": t})
+            seen.add(incoming)
+            last_seen[incoming] = t
+
+        if return_binary_matrix:
+            binary_hits.append(row_hits)
+            binary_fas.append(row_fas)
+
+    # ------------------ RETURN ------------------
+    out = {
+        "stds_over_time": np.array(stds_over_time),
+        "metric": metric,
+        "isi_hit_dists": isi_hit_dists,
+        "score_type": "likelihood" if metric == "loglikelihood" else "distance",
+        "fa_by_t": fa_by_t,
+        "T_max": T_max,
+    }
+
+    if not return_binary_matrix:
+        out.update({
+            "hits": np.array(hit_scores),
+            "fas": np.array(fa_scores),
+            "item_hits": item_hits,
+            "item_fas": item_fas,
+        })
+
+    if return_binary_matrix:
+        out.update({
+            "hits": pd.DataFrame(binary_hits),
+            "fas": pd.DataFrame(binary_fas),
+        })
+
+    return out
+
+
+def run_experiment_scores_prior(debug=False, seed=0, **kwargs):
+    """Runner wrapper for the prior-aware simulation engine."""
+    schedule = make_noise_schedule(kwargs["noise_mode"], kwargs)
+    core_kwargs = filter_kwargs_for_core_prior(kwargs)
+    return run_model_core_prior(
+        **core_kwargs,
+        noise_schedule=schedule,
+        return_item_scores=False,
+        return_binary_matrix=False,
+        debug=debug,
+        seed=seed,
+    )
