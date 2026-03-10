@@ -1,6 +1,5 @@
 import sys
 import torch
-import numpy as np
 import functools
 import matplotlib.pyplot as plt
 import argparse, yaml, os
@@ -82,51 +81,11 @@ class ScoreFunction():
 
         self.score_model = self.score_model.to(self.device)
         
-        self.ckpt_path = self.cfg.model.ckpt_path.format(self.cfg.data.n_pcs, self.mode)
-        ckpt_path = "/om2/user/lakshmin/audio-prior/" + self.ckpt_path
+        self.ckpt_path = "/om2/user/lakshmin/audio-prior/" + self.cfg.model.ckpt_path.format(self.cfg.data.n_pcs, self.mode)
         if 'SLURM_RESTART_COUNT' in os.environ.keys() or self.restart:
             self.score_model.load_state_dict(torch.load(self.ckpt_path))
 
         
-    def compute_log_prior(self, x, batch_size=64):
-        """
-        Compute log π(x) via ODE likelihood integration.
-
-        Parameters
-        ----------
-        x : tensor [B, D] or [D]
-            Input representations (e.g. 256-dim PCA texture stats).
-
-        Returns
-        -------
-        log_pi : tensor [B]
-            Log-probability under the learned prior (in nats).
-        """
-        if x.dim() == 1:
-            x = x.unsqueeze(0)
-        B, D = x.shape
-        # ode_likelihood expects [B, 1, 1, D]
-        x4 = x.reshape(B, 1, 1, D).to(self.device)
-
-        all_log_pi = []
-        for start in range(0, B, batch_size):
-            batch = x4[start : start + batch_size]
-            _, bpd = ode_likelihood(
-                batch,
-                self.score_model,
-                marginal_prob_std_fn,
-                diffusion_coeff_fn,
-                batch.shape[0],
-                device=self.device,
-                eps=1e-5,
-            )
-            # bpd is bits-per-dimension (higher = less probable)
-            # Convert to log-probability in nats: log_pi = -bpd * D * ln(2)
-            log_pi = -bpd * D * np.log(2)
-            all_log_pi.append(log_pi)
-
-        return torch.cat(all_log_pi, dim=0)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Return unit-norm score direction with same layout as the model output."""
         # Ensure tensor on the right device/dtype
