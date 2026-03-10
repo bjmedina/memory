@@ -29,17 +29,23 @@ from texture_prior.params import statistics_set, texture_dataset
 from texture_prior.utils import path
 
 
-import sys
+import importlib
 import importlib.util
-import os
 
-# Add the new path
-audio_prior_path = '/om2/user/lakshmin/audio-prior/'
-sys.path.insert(0, audio_prior_path)  # insert at front of sys.path
+# ── Load audio-prior modules without conflicting with the local utils/ ──
+_audio_prior_path = '/om2/user/lakshmin/audio-prior/'
+
+# Temporarily hide any cached 'utils' so audio-prior's utils is found
+_saved_utils = sys.modules.pop('utils', None)
+sys.path.insert(0, _audio_prior_path)
 
 from models import ScoreNetAudio, ScoreNetTexture1D, ScoreNetAudioV2
-from utils import synthesis, projection, audio
-from utils.sde_utils import *
+from utils.sde_utils import marginal_prob_std_fn, diffusion_coeff_fn, ode_likelihood
+
+# Restore the original utils if it existed
+sys.path.remove(_audio_prior_path)
+if _saved_utils is not None:
+    sys.modules['utils'] = _saved_utils
 
 
 def parse(d):
