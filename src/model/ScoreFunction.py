@@ -123,5 +123,32 @@ class ScoreFunction():
         unit_score = unit_score_flat.reshape_as(score)          # [B, 1, 1, D]
         return unit_score
 
+    def forward_raw(self, x: torch.Tensor) -> torch.Tensor:
+        """Return the raw (unnormalized) score ∇_x log p(x).
+
+        Same preprocessing as :meth:`forward` but skips the unit-norm
+        normalization, so the output magnitude reflects how steep the
+        log-density gradient is at *x*.
+        """
+        x = x.to(self.device)
+
+        if x.dim() == 1:
+            x4 = x.reshape(1, 1, 1, x.shape[0])
+        elif x.dim() == 2:
+            B, D = x.shape
+            x4 = x.reshape(B, 1, 1, D)
+        elif x.dim() == 4:
+            x4 = x
+        else:
+            raise ValueError(f"Unsupported x shape {tuple(x.shape)}; expected [D], [B,D], or [B,1,1,D].")
+
+        B = x4.shape[0]
+        t = torch.full((B,), 0.01, device=x4.device, dtype=x4.dtype)
+
+        with torch.no_grad():
+            score = self.score_model(x4, t)
+
+        return score
+
 
         
