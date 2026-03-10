@@ -196,6 +196,7 @@ def evaluate_sigma_on_toy_experiments(
     t_step,
     n_mc=32,
     seed=0,
+    **extra_runner_kwargs,
 ):
     """
     Evaluate one sigma candidate on toy experiments across ISI conditions.
@@ -212,6 +213,9 @@ def evaluate_sigma_on_toy_experiments(
         Fixed sigma values, e.g. ``{"sigma0": 5.0, "sigma2": 0.1}``.
     noise_mode, metric, X0, name_to_idx, t_step :
         Forwarded to *run_experiment_fn*.
+    **extra_runner_kwargs :
+        Additional keyword arguments forwarded to *run_experiment_fn*
+        (e.g. ``score_model``, ``drift_step_size``).
     experiments_by_isi : dict[int, list[list]]
         ISI -> list of experiment sequences.
     human_dprimes_by_isi : dict[int, float]
@@ -251,6 +255,7 @@ def evaluate_sigma_on_toy_experiments(
                 experiment_list=exp_list,
                 debug=False,
                 seed=seed * 10_000 + isi_val * 1000 + rep,
+                **extra_runner_kwargs,
             )
             all_hits.extend(run_out["hits"])
             all_fas.extend(run_out["fas"])
@@ -304,6 +309,7 @@ def evaluate_sigma_on_toy_experiments_sample(
     n_mc=32,
     seed=0,
     auroc_fn=None,
+    **extra_runner_kwargs,
 ):
     """
     Evaluate one sigma candidate on toy experiments across ISI conditions.
@@ -320,6 +326,9 @@ def evaluate_sigma_on_toy_experiments_sample(
         Fixed sigma values, e.g. ``{"sigma0": 5.0, "sigma2": 0.1}``.
     noise_mode, metric, X0, name_to_idx, t_step :
         Forwarded to *run_experiment_fn*.
+    **extra_runner_kwargs :
+        Additional keyword arguments forwarded to *run_experiment_fn*
+        (e.g. ``score_model``, ``drift_step_size``).
     experiments_by_isi : dict[int, list[list]]
         ISI -> list of experiment sequences.
     human_dprimes_by_isi : dict[int, float]
@@ -362,6 +371,7 @@ def evaluate_sigma_on_toy_experiments_sample(
                 experiment_list=exp_list,
                 debug=False,
                 seed=seed * 10_000 + isi_val * 1000 + rep,
+                **extra_runner_kwargs,
             )
             all_hits.extend(run_out["hits"])
             all_fas.extend(run_out["fas"])
@@ -422,6 +432,7 @@ def fit_sigma_1d(
     target_isis=None,
     n_seqs_per_rep=10,
     auroc_fn=None,
+    **extra_runner_kwargs,
 ):
     """
     Fit a single sigma via 1-D grid search with iterative refinement.
@@ -527,6 +538,7 @@ def fit_sigma_1d(
                     n_mc=n_mc,
                     seed=seed + iteration * 100_000 + i,
                     auroc_fn=auroc_fn,
+                    **extra_runner_kwargs,
                 )
             else:
                 if verbose:
@@ -546,6 +558,7 @@ def fit_sigma_1d(
                     n_mc=n_mc,
                     seed=seed + iteration * 100_000 + i,
                     auroc_fn=auroc_fn,
+                    **extra_runner_kwargs,
                 )
             iter_results.append(result)
 
@@ -1107,6 +1120,7 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
     n_mc=32,
     seed=0,
     auroc_fn=None,
+    **extra_runner_kwargs,
 ):
     """
     Evaluate one sigma candidate on compact multi-ISI sequences.
@@ -1129,6 +1143,9 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
         Values of the other (already-fitted) sigmas.
     noise_mode, metric, X0, name_to_idx, t_step :
         Forwarded to *run_experiment_fn*.
+    **extra_runner_kwargs :
+        Additional keyword arguments forwarded to *run_experiment_fn*
+        (e.g. ``score_model``, ``drift_step_size``).
     experiment_list : list[list]
         Multi-ISI experiment sequences (stimulus file paths).
     isi_keys : list[list[int]]
@@ -1189,6 +1206,7 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
                 experiment_list=[seq],
                 debug=False,
                 seed=seed + rep * 1000 + int(si),
+                **extra_runner_kwargs,
             )
             h = np.asarray(run_out["hits"])
             f = np.asarray(run_out["fas"])
@@ -1210,12 +1228,12 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
         for isi_val in target_isis:
             mask = isis_arr == isi_val
             hits_isi = hits_arr[mask]
-            
+
             if len(hits_isi) == 0:
                 continue
-                
+
             human_dp = human_dprimes_by_isi.get(isi_val)
-            
+
             if human_dp is None:
                 continue
             
@@ -1263,6 +1281,7 @@ def evaluate_sigma_on_multi_isi_sequences(
     n_seqs_per_rep=10,
     n_mc=32,
     seed=0,
+    **extra_runner_kwargs,
 ):
     """
     Evaluate one sigma candidate on compact multi-ISI sequences.
@@ -1285,6 +1304,9 @@ def evaluate_sigma_on_multi_isi_sequences(
         Values of the other (already-fitted) sigmas.
     noise_mode, metric, X0, name_to_idx, t_step :
         Forwarded to *run_experiment_fn*.
+    **extra_runner_kwargs :
+        Additional keyword arguments forwarded to *run_experiment_fn*
+        (e.g. ``score_model``, ``drift_step_size``).
     experiment_list : list[list]
         Multi-ISI experiment sequences (stimulus file paths).
     isi_keys : list[list[int]]
@@ -1339,6 +1361,7 @@ def evaluate_sigma_on_multi_isi_sequences(
                 experiment_list=[seq],
                 debug=False,
                 seed=seed + rep * 1000 + int(si),
+                **extra_runner_kwargs,
             )
             h = np.asarray(run_out["hits"])
             f = np.asarray(run_out["fas"])
