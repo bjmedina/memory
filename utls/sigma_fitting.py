@@ -138,6 +138,13 @@ def compute_auroc_sparse12(hits, fas):
     """
     return compute_auroc_sparse(hits, fas, n_points=12)
 
+def compute_auroc_sparse12(hits, fas):
+    """Compute AUROC using sparse 24-point sampled ROC.
+
+    Convenience wrapper around :func:`compute_auroc_sparse` with
+    ``n_points=12``.
+    """
+    return compute_auroc_sparse(hits, fas, n_points=24)
 
 def _compute_auroc_upper_envelope(hits, fas, n_interp=1000):
     """Compute AUROC using upper-envelope ROC with dense interpolation.

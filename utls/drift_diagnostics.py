@@ -35,7 +35,9 @@ def drift_trajectory(
     step_size,
     n_steps,
     X_clean=None,
+    x_source=None,
     use_unit_norm=True,
+    knn_k=5,
 ):
     """
     Run gradient-ascent drift from *x_start* and record diagnostics.
@@ -51,19 +53,27 @@ def drift_trajectory(
     n_steps : int
         Number of drift iterations.
     X_clean : Tensor [N, D] or None
-        If provided, tracks min-distance to any row of *X_clean*.
+        If provided, tracks distance metrics to *X_clean*.
+    x_source : Tensor [D] or None
+        The original clean point before corruption.  If provided, tracks
+        cosine distance back to the source stimulus.
     use_unit_norm : bool
         If True (default), drift uses the unit-norm score (matching the
         runner).  If False, uses the raw score.
+    knn_k : int
+        Number of neighbours for median k-NN distance (default 5).
 
     Returns
     -------
     dict
-        ``x_trajectory``   : list of [D] tensors (length n_steps+1)
-        ``raw_score_norms`` : [n_steps] float array
-        ``unit_score_norms``: [n_steps] float array  (should be ≈1)
-        ``dist_to_clean``  : [n_steps+1] float array or None
-        ``step_sizes_actual``: [n_steps] float — actual L2 displacement per step
+        ``x_trajectory``      : list of [D] tensors (length n_steps+1)
+        ``raw_score_norms``    : [n_steps] float array
+        ``unit_score_norms``   : [n_steps] float array  (should be ≈1)
+        ``dist_to_clean``      : [n_steps+1] float array — L2 to nearest
+        ``median_knn_dist``    : [n_steps+1] float array — median L2 to k-NN
+        ``cosine_dist_nearest``: [n_steps+1] float array — cosine dist to nearest
+        ``cosine_dist_source`` : [n_steps+1] float array or None
+        ``step_sizes_actual``  : [n_steps] float — actual L2 displacement per step
     """
     x = x_start.detach().clone().float()
     if x.dim() == 2 and x.shape[0] == 1:
@@ -72,15 +82,24 @@ def drift_trajectory(
     device = x.device
     if X_clean is not None:
         X_clean = X_clean.to(device).float()
+    if x_source is not None:
+        x_source = x_source.to(device).float()
 
     trajectory = [x.clone()]
     raw_norms = []
     unit_norms = []
     displacements = []
     dists = []
+    knn_dists = []
+    cos_dists_nearest = []
+    cos_dists_source = []
 
     if X_clean is not None:
         dists.append(_min_dist(x, X_clean))
+        knn_dists.append(_median_knn_dist(x, X_clean, k=knn_k))
+        cos_dists_nearest.append(_cosine_dist_to_nearest(x, X_clean))
+    if x_source is not None:
+        cos_dists_source.append(_cosine_dist_to_source(x, x_source))
 
     for _ in range(n_steps):
         # raw score (for diagnostics)
@@ -105,15 +124,23 @@ def drift_trajectory(
         trajectory.append(x.clone())
         if X_clean is not None:
             dists.append(_min_dist(x, X_clean))
+            knn_dists.append(_median_knn_dist(x, X_clean, k=knn_k))
+            cos_dists_nearest.append(_cosine_dist_to_nearest(x, X_clean))
+        if x_source is not None:
+            cos_dists_source.append(_cosine_dist_to_source(x, x_source))
 
     return {
         "x_trajectory": trajectory,
         "raw_score_norms": np.array(raw_norms),
         "unit_score_norms": np.array(unit_norms),
         "dist_to_clean": np.array(dists) if dists else None,
+        "median_knn_dist": np.array(knn_dists) if knn_dists else None,
+        "cosine_dist_nearest": np.array(cos_dists_nearest) if cos_dists_nearest else None,
+        "cosine_dist_source": np.array(cos_dists_source) if cos_dists_source else None,
         "step_sizes_actual": np.array(displacements),
         "step_size": step_size,
         "n_steps": n_steps,
+        "knn_k": knn_k,
     }
 
 
@@ -122,48 +149,97 @@ def _min_dist(x, X_clean):
     return float((X_clean - x.unsqueeze(0)).norm(dim=1).min().cpu())
 
 
+def _median_knn_dist(x, X_clean, k=5):
+    """Median L2 distance from x [D] to its k nearest neighbours in X_clean."""
+    dists = (X_clean - x.unsqueeze(0)).norm(dim=1)       # [N]
+    topk = dists.topk(k, largest=False).values            # [k]
+    return float(topk.median().cpu())
+
+
+def _cosine_dist_to_nearest(x, X_clean):
+    """Cosine distance (1 - cos_sim) from x [D] to nearest clean point (by cosine)."""
+    x_norm = x / (x.norm() + 1e-12)
+    X_norm = X_clean / (X_clean.norm(dim=1, keepdim=True) + 1e-12)
+    cos_sims = (X_norm @ x_norm)                          # [N]
+    return float((1.0 - cos_sims.max()).cpu())
+
+
+def _cosine_dist_to_source(x, x_source):
+    """Cosine distance (1 - cos_sim) between x [D] and x_source [D]."""
+    cos_sim = torch.dot(x, x_source) / (x.norm() * x_source.norm() + 1e-12)
+    return float((1.0 - cos_sim).cpu())
+
+
 def plot_drift_diagnostic(traj, title=None):
     """
     Plot drift trajectory diagnostics.
 
-    Panels:
-      1. Raw score norm over steps (should decrease toward mode).
-      2. Distance to nearest clean point (should decrease).
-      3. Actual step displacement (should be roughly constant for unit-norm).
+    Row 1: Raw score norm | L2 to nearest | Step displacement
+    Row 2: Median k-NN dist | Cosine dist (nearest) | Cosine dist (source)
     """
     steps = np.arange(traj["n_steps"])
-    n_panels = 2 + (traj["dist_to_clean"] is not None)
+    step_ax = np.arange(traj["n_steps"] + 1)
+    has_clean = traj["dist_to_clean"] is not None
+    has_source = traj.get("cosine_dist_source") is not None
 
-    fig, axes = plt.subplots(1, n_panels, figsize=(5 * n_panels, 4))
-    if n_panels == 1:
-        axes = [axes]
+    n_rows = 1 + has_clean
+    n_cols = 3
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4.5 * n_rows))
+    if n_rows == 1:
+        axes = axes[np.newaxis, :]
 
-    # Panel 1: raw score norm
-    ax = axes[0]
+    # --- Row 1 ---
+    ax = axes[0, 0]
     ax.plot(steps, traj["raw_score_norms"], linewidth=1.2)
     ax.set_xlabel("Drift step")
     ax.set_ylabel("||∇ log p(x)||")
     ax.set_title("Raw score norm")
     ax.grid(alpha=0.25)
 
-    # Panel 2: distance to clean
-    idx = 1
-    if traj["dist_to_clean"] is not None:
-        ax = axes[idx]
-        ax.plot(np.arange(traj["n_steps"] + 1), traj["dist_to_clean"], linewidth=1.2)
+    if has_clean:
+        ax = axes[0, 1]
+        ax.plot(step_ax, traj["dist_to_clean"], linewidth=1.2)
         ax.set_xlabel("Drift step")
         ax.set_ylabel("L2 dist to nearest clean")
-        ax.set_title("Distance to data manifold")
+        ax.set_title("L2 to nearest")
         ax.grid(alpha=0.25)
-        idx += 1
+    else:
+        axes[0, 1].axis("off")
 
-    # Panel 3: displacement per step
-    ax = axes[idx]
+    ax = axes[0, 2]
     ax.plot(steps, traj["step_sizes_actual"], linewidth=1.2)
     ax.set_xlabel("Drift step")
     ax.set_ylabel("||Δx||")
     ax.set_title(f"Step displacement (step_size={traj['step_size']:.4f})")
     ax.grid(alpha=0.25)
+
+    # --- Row 2 (distance metrics) ---
+    if has_clean:
+        knn_k = traj.get("knn_k", 5)
+
+        ax = axes[1, 0]
+        ax.plot(step_ax, traj["median_knn_dist"], linewidth=1.2, color="C1")
+        ax.set_xlabel("Drift step")
+        ax.set_ylabel(f"Median L2 to {knn_k}-NN")
+        ax.set_title(f"Median {knn_k}-NN distance")
+        ax.grid(alpha=0.25)
+
+        ax = axes[1, 1]
+        ax.plot(step_ax, traj["cosine_dist_nearest"], linewidth=1.2, color="C2")
+        ax.set_xlabel("Drift step")
+        ax.set_ylabel("Cosine distance")
+        ax.set_title("Cosine dist to nearest")
+        ax.grid(alpha=0.25)
+
+        ax = axes[1, 2]
+        if has_source:
+            ax.plot(step_ax, traj["cosine_dist_source"], linewidth=1.2, color="C3")
+            ax.set_xlabel("Drift step")
+            ax.set_ylabel("Cosine distance")
+            ax.set_title("Cosine dist to source")
+            ax.grid(alpha=0.25)
+        else:
+            ax.axis("off")
 
     if title:
         fig.suptitle(title, y=1.03, fontsize=13)
@@ -180,13 +256,18 @@ def drift_diagnostic_batch(
     step_size=0.001,
     n_steps=200,
     seed=42,
+    knn_k=5,
 ):
     """
     Run drift trajectories from multiple noisy samples and plot aggregate stats.
 
     Picks *n_samples* random clean points, adds Gaussian noise, drifts
-    each back, and plots the mean ± std of raw score norm and distance
-    to nearest clean point.
+    each back, and plots the mean +/- std of:
+      - Raw score norm
+      - L2 to nearest clean
+      - Median k-NN distance
+      - Cosine dist to nearest
+      - Cosine dist to source
 
     Returns
     -------
@@ -206,38 +287,71 @@ def drift_diagnostic_batch(
             step_size=step_size,
             n_steps=n_steps,
             X_clean=X_clean,
+            x_source=x_clean,
+            knn_k=knn_k,
         )
         trajs.append(traj)
 
-    # Aggregate and plot
+    # Aggregate
     steps = np.arange(n_steps)
+    step_ax = np.arange(n_steps + 1)
+
     all_norms = np.stack([t["raw_score_norms"] for t in trajs])
-    all_dists = np.stack([t["dist_to_clean"] for t in trajs])
+    all_l2 = np.stack([t["dist_to_clean"] for t in trajs])
+    all_knn = np.stack([t["median_knn_dist"] for t in trajs])
+    all_cos_near = np.stack([t["cosine_dist_nearest"] for t in trajs])
+    all_cos_src = np.stack([t["cosine_dist_source"] for t in trajs])
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    def _band(ax, x, arr, **kwargs):
+        m, s = arr.mean(0), arr.std(0)
+        line, = ax.plot(x, m, linewidth=1.5, **kwargs)
+        ax.fill_between(x, m - s, m + s, alpha=0.2, color=line.get_color())
 
-    ax = axes[0]
-    mean_n, std_n = all_norms.mean(0), all_norms.std(0)
-    ax.plot(steps, mean_n, linewidth=1.5)
-    ax.fill_between(steps, mean_n - std_n, mean_n + std_n, alpha=0.2)
+    fig, axes = plt.subplots(2, 3, figsize=(15, 9))
+
+    # Row 1
+    ax = axes[0, 0]
+    _band(ax, steps, all_norms)
     ax.set_xlabel("Drift step")
     ax.set_ylabel("||∇ log p(x)||")
     ax.set_title(f"Raw score norm (n={n_samples})")
     ax.grid(alpha=0.25)
 
-    ax = axes[1]
-    step_ax = np.arange(n_steps + 1)
-    mean_d, std_d = all_dists.mean(0), all_dists.std(0)
-    ax.plot(step_ax, mean_d, linewidth=1.5)
-    ax.fill_between(step_ax, mean_d - std_d, mean_d + std_d, alpha=0.2)
+    ax = axes[0, 1]
+    _band(ax, step_ax, all_l2)
     ax.set_xlabel("Drift step")
     ax.set_ylabel("L2 dist to nearest clean")
-    ax.set_title(f"Distance to data (n={n_samples}, noise_std={noise_std})")
+    ax.set_title(f"L2 to nearest (n={n_samples})")
     ax.grid(alpha=0.25)
 
+    ax = axes[0, 2]
+    _band(ax, step_ax, all_knn, color="C1")
+    ax.set_xlabel("Drift step")
+    ax.set_ylabel(f"Median L2 to {knn_k}-NN")
+    ax.set_title(f"Median {knn_k}-NN distance (n={n_samples})")
+    ax.grid(alpha=0.25)
+
+    # Row 2
+    ax = axes[1, 0]
+    _band(ax, step_ax, all_cos_near, color="C2")
+    ax.set_xlabel("Drift step")
+    ax.set_ylabel("Cosine distance")
+    ax.set_title(f"Cosine dist to nearest (n={n_samples})")
+    ax.grid(alpha=0.25)
+
+    ax = axes[1, 1]
+    _band(ax, step_ax, all_cos_src, color="C3")
+    ax.set_xlabel("Drift step")
+    ax.set_ylabel("Cosine distance")
+    ax.set_title(f"Cosine dist to source (n={n_samples})")
+    ax.grid(alpha=0.25)
+
+    axes[1, 2].axis("off")
+
     fig.suptitle(
-        f"Drift diagnostic: step_size={step_size}, n_steps={n_steps}",
-        y=1.03, fontsize=13,
+        f"Drift diagnostic: step_size={step_size}, n_steps={n_steps}, "
+        f"noise_std={noise_std}",
+        y=1.02, fontsize=13,
     )
     fig.tight_layout()
     plt.show()
