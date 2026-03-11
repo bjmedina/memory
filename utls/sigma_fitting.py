@@ -129,7 +129,15 @@ def compute_auroc_sparse(hits, fas, n_points=12):
 
     return float(np.trapz(final_tpr, final_fpr))
 
-
+def make_sparse_dprime_fn(n_pts):
+    """Factory: return a (hits, fas) -> (dprime, auroc) function for given n_pts."""
+    def fn(hits, fas):
+        auroc = compute_auroc_sparse(hits, fas, n_points=n_pts)
+        if np.isnan(auroc):
+            return np.nan, np.nan
+        return auc_to_dprime(auroc), auroc
+    return fn
+    
 def compute_auroc_sparse12(hits, fas):
     """Compute AUROC using sparse 12-point sampled ROC.
 
@@ -145,6 +153,22 @@ def compute_auroc_sparse12(hits, fas):
     ``n_points=12``.
     """
     return compute_auroc_sparse(hits, fas, n_points=24)
+
+def compute_auroc_sparse500(hits, fas):
+    """Compute AUROC using sparse 24-point sampled ROC.
+
+    Convenience wrapper around :func:`compute_auroc_sparse` with
+    ``n_points=12``.
+    """
+    return compute_auroc_sparse(hits, fas, n_points=500)
+
+def compute_auroc_sparse48(hits, fas):
+    """Compute AUROC using sparse 24-point sampled ROC.
+
+    Convenience wrapper around :func:`compute_auroc_sparse` with
+    ``n_points=12``.
+    """
+    return compute_auroc_sparse(hits, fas, n_points=48)
 
 def _compute_auroc_upper_envelope(hits, fas, n_interp=1000):
     """Compute AUROC using upper-envelope ROC with dense interpolation.
