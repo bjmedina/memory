@@ -75,5 +75,5 @@ def plot_roc(ax, fpr, tpr, label):
 
 def auroc_to_dprime(auroc):
     """Convert AUROC to d′ via z-transform rule."""
-    auroc = np.clip(auroc, 1e-6, 1 - 1e-6)
+    auroc = np.clip(auroc, 1e-8, 1 - 1e-8)
     return np.sqrt(2) * norm.ppf(auroc)

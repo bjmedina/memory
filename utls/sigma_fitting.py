@@ -1293,6 +1293,8 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
         "mse_std": float(np.std(mse_per_rep)) if mse_per_rep else np.nan,
         "dprime_mean_by_isi": dprime_mean_by_isi,
         "dprime_std_by_isi": dprime_std_by_isi,
+        "hits_arr": hits_arr,
+        "fas_arr": fas_arr
     }
 
 def evaluate_sigma_on_multi_isi_sequences(
