@@ -1173,31 +1173,38 @@ def run_model_core_prior(
             scores = []
 
             # ------------------ UPDATE MEMORIES ------------------
-            for mem in memory_bank:
-                age = t - mem["t_inserted"]
+            if memory_bank:
+                ages = [t - mem["t_inserted"] for mem in memory_bank]
+                stds = [noise_schedule(age) for age in ages]
 
-                std = noise_schedule(age)
-                stds_over_time.append((age, std))
+                for age, std in zip(ages, stds):
+                    stds_over_time.append((age, std))
 
-                # random noise
-                noise = torch.randn(
-                    mem["mu"].shape,
-                    device=mem["mu"].device,
-                    dtype=mem["mu"].dtype,
+                # random noise (batched)
+                mu_dtype = memory_bank[0]["mu"].dtype
+                mu_device = memory_bank[0]["mu"].device
+                noise_batch = torch.randn(
+                    len(memory_bank),
+                    D,
+                    device=mu_device,
+                    dtype=mu_dtype,
                     generator=torch_rng,
-                ) * (std * scaled_std)
+                )
+                for i, (mem, std) in enumerate(zip(memory_bank, stds)):
+                    mem["mu"] += noise_batch[i:i + 1] * (std * scaled_std)
 
-                mem["mu"] += noise
-
-                # prior-driven drift
+                # prior-driven drift (batched)
                 if drift_step_size > 0:
+                    mu_batch = torch.cat([mem["mu"] for mem in memory_bank], dim=0)
                     with torch.no_grad():
-                        drift = score_model.forward(mem["mu"])
-                    mem["mu"] += drift_step_size * drift.view_as(mem["mu"])
+                        drift_batch = score_model.forward(mu_batch)
+                    for i, mem in enumerate(memory_bank):
+                        mem["mu"] += drift_step_size * drift_batch[i].view_as(mem["mu"])
 
                 # score
-                score = compute_score(probe, mem["mu"], std, metric)
-                scores.append(score)
+                for mem, std in zip(memory_bank, stds):
+                    score = compute_score(probe, mem["mu"], std, metric)
+                    scores.append(score)
 
             # ------------------ DECISION STEP ------------------
             if scores:

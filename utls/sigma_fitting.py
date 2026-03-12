@@ -20,7 +20,7 @@ import json
 import os
 from datetime import datetime
 from scipy.stats import norm
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, roc_curve
 
 try:
     get_ipython()
@@ -170,15 +170,12 @@ def compute_auroc_sparse48(hits, fas):
     """
     return compute_auroc_sparse(hits, fas, n_points=48)
 
-def _compute_auroc_upper_envelope(hits, fas, n_interp=1000):
-    """Compute AUROC using upper-envelope ROC with dense interpolation.
+def _compute_auroc_upper_envelope(hits, fas, n_interp=200):
+    """Compute AUROC using an upper-envelope ROC with interpolation.
 
-    Builds the full ROC curve (lower score = more signal), takes the
-    upper envelope (max TPR per unique FPR), anchors at (0,0) and (1,1),
-    then interpolates onto a dense uniform FPR grid before integrating.
-
-    This produces much more stable AUROC/d' estimates than the previous
-    sparse 12-point sampled-ROC approach.
+    Uses a vectorized ROC construction from ``sklearn`` (lower score =
+    stronger signal), then takes a monotonic upper envelope of TPR as a
+    function of FPR before integrating on a uniform grid.
     """
     hits = np.asarray(hits, dtype=float)
     fas = np.asarray(fas, dtype=float)
@@ -188,27 +185,16 @@ def _compute_auroc_upper_envelope(hits, fas, n_interp=1000):
 
     scores = np.concatenate([hits, fas])
     y_true = np.concatenate([np.ones(P), np.zeros(N)])
+    # ``roc_curve`` assumes larger score => positive class, so flip sign.
+    fpr, tpr, _ = roc_curve(y_true, -scores)
 
-    thr = np.unique(np.sort(scores))
-    tpr = np.array([(scores[y_true == 1] <= t).sum() / P for t in thr])
-    fpr = np.array([(scores[y_true == 0] <= t).sum() / N for t in thr])
+    # enforce upper envelope (monotonic best-TPR curve)
+    tpr_env = np.maximum.accumulate(tpr)
 
-    # Upper-envelope: for each unique FPR, retain max TPR
-    unique_fpr = np.unique(fpr)
-    max_tpr = np.array([tpr[fpr == f].max() for f in unique_fpr])
-
-    # Anchor at (0,0) and (1,1)
-    if unique_fpr[0] > 0:
-        unique_fpr = np.concatenate([[0.0], unique_fpr])
-        max_tpr = np.concatenate([[0.0], max_tpr])
-    if unique_fpr[-1] < 1:
-        unique_fpr = np.concatenate([unique_fpr, [1.0]])
-        max_tpr = np.concatenate([max_tpr, [1.0]])
-
-    # Dense uniform interpolation
-    target_fpr = np.linspace(0, 1, n_interp)
-    tpr_s = np.interp(target_fpr, unique_fpr, max_tpr)
-    return float(np.trapz(tpr_s, target_fpr))
+    # interpolate on a moderately dense grid for smooth/robust estimates
+    target_fpr = np.linspace(0.0, 1.0, n_interp)
+    tpr_interp = np.interp(target_fpr, fpr, tpr_env)
+    return float(np.trapz(tpr_interp, target_fpr))
 
 
 # ── core evaluation ──────────────────────────────────────────────────
