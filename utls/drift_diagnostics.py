@@ -71,7 +71,7 @@ def drift_trajectory(
         ``unit_score_norms``   : [n_steps] float array  (should be ≈1)
         ``dist_to_clean``      : [n_steps+1] float array — L2 to nearest
         ``median_knn_dist``    : [n_steps+1] float array — median L2 to k-NN
-        ``cosine_dist_nearest``: [n_steps+1] float array — cosine dist to nearest
+        ``median_knn_cosine_dist``: [n_steps+1] float array — median cosine dist to k-NN
         ``cosine_dist_source`` : [n_steps+1] float array or None
         ``step_sizes_actual``  : [n_steps] float — actual L2 displacement per step
     """
@@ -97,7 +97,7 @@ def drift_trajectory(
     if X_clean is not None:
         dists.append(_min_dist(x, X_clean))
         knn_dists.append(_median_knn_dist(x, X_clean, k=knn_k))
-        cos_dists_nearest.append(_cosine_dist_to_nearest(x, X_clean))
+        cos_dists_nearest.append(_median_knn_cosine_dist(x, X_clean, k=knn_k))
     if x_source is not None:
         cos_dists_source.append(_cosine_dist_to_source(x, x_source))
 
@@ -125,7 +125,7 @@ def drift_trajectory(
         if X_clean is not None:
             dists.append(_min_dist(x, X_clean))
             knn_dists.append(_median_knn_dist(x, X_clean, k=knn_k))
-            cos_dists_nearest.append(_cosine_dist_to_nearest(x, X_clean))
+            cos_dists_nearest.append(_median_knn_cosine_dist(x, X_clean, k=knn_k))
         if x_source is not None:
             cos_dists_source.append(_cosine_dist_to_source(x, x_source))
 
@@ -135,7 +135,7 @@ def drift_trajectory(
         "unit_score_norms": np.array(unit_norms),
         "dist_to_clean": np.array(dists) if dists else None,
         "median_knn_dist": np.array(knn_dists) if knn_dists else None,
-        "cosine_dist_nearest": np.array(cos_dists_nearest) if cos_dists_nearest else None,
+        "median_knn_cosine_dist": np.array(cos_dists_nearest) if cos_dists_nearest else None,
         "cosine_dist_source": np.array(cos_dists_source) if cos_dists_source else None,
         "step_sizes_actual": np.array(displacements),
         "step_size": step_size,
@@ -156,12 +156,13 @@ def _median_knn_dist(x, X_clean, k=5):
     return float(topk.median().cpu())
 
 
-def _cosine_dist_to_nearest(x, X_clean):
-    """Cosine distance (1 - cos_sim) from x [D] to nearest clean point (by cosine)."""
+def _median_knn_cosine_dist(x, X_clean, k=5):
+    """Median cosine distance (1 - cos_sim) to k nearest neighbours by cosine."""
     x_norm = x / (x.norm() + 1e-12)
     X_norm = X_clean / (X_clean.norm(dim=1, keepdim=True) + 1e-12)
-    cos_sims = (X_norm @ x_norm)                          # [N]
-    return float((1.0 - cos_sims.max()).cpu())
+    cos_sims = X_norm @ x_norm                              # [N]
+    topk_sims = cos_sims.topk(k, largest=True).values       # [k] highest similarities
+    return float((1.0 - topk_sims.median()).cpu())
 
 
 def _cosine_dist_to_source(x, x_source):
@@ -175,7 +176,7 @@ def plot_drift_diagnostic(traj, title=None):
     Plot drift trajectory diagnostics.
 
     Row 1: Raw score norm | L2 to nearest | Step displacement
-    Row 2: Median k-NN dist | Cosine dist (nearest) | Cosine dist (source)
+    Row 2: Median k-NN L2 | Median k-NN cosine | Cosine dist (source)
     """
     steps = np.arange(traj["n_steps"])
     step_ax = np.arange(traj["n_steps"] + 1)
@@ -225,10 +226,10 @@ def plot_drift_diagnostic(traj, title=None):
         ax.grid(alpha=0.25)
 
         ax = axes[1, 1]
-        ax.plot(step_ax, traj["cosine_dist_nearest"], linewidth=1.2, color="C2")
+        ax.plot(step_ax, traj["median_knn_cosine_dist"], linewidth=1.2, color="C2")
         ax.set_xlabel("Drift step")
-        ax.set_ylabel("Cosine distance")
-        ax.set_title("Cosine dist to nearest")
+        ax.set_ylabel(f"Median cosine dist to {knn_k}-NN")
+        ax.set_title(f"Median {knn_k}-NN cosine dist")
         ax.grid(alpha=0.25)
 
         ax = axes[1, 2]
@@ -266,7 +267,7 @@ def drift_diagnostic_batch(
       - Raw score norm
       - L2 to nearest clean
       - Median k-NN distance
-      - Cosine dist to nearest
+      - Median k-NN cosine distance
       - Cosine dist to source
 
     Returns
@@ -299,7 +300,7 @@ def drift_diagnostic_batch(
     all_norms = np.stack([t["raw_score_norms"] for t in trajs])
     all_l2 = np.stack([t["dist_to_clean"] for t in trajs])
     all_knn = np.stack([t["median_knn_dist"] for t in trajs])
-    all_cos_near = np.stack([t["cosine_dist_nearest"] for t in trajs])
+    all_cos_near = np.stack([t["median_knn_cosine_dist"] for t in trajs])
     all_cos_src = np.stack([t["cosine_dist_source"] for t in trajs])
 
     def _band(ax, x, arr, **kwargs):
@@ -335,8 +336,8 @@ def drift_diagnostic_batch(
     ax = axes[1, 0]
     _band(ax, step_ax, all_cos_near, color="C2")
     ax.set_xlabel("Drift step")
-    ax.set_ylabel("Cosine distance")
-    ax.set_title(f"Cosine dist to nearest (n={n_samples})")
+    ax.set_ylabel(f"Median cosine dist to {knn_k}-NN")
+    ax.set_title(f"Median {knn_k}-NN cosine dist (n={n_samples})")
     ax.grid(alpha=0.25)
 
     ax = axes[1, 1]
