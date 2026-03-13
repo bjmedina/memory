@@ -1289,8 +1289,17 @@ def run_model_core_prior(
 
 
 def run_experiment_scores_prior(debug=False, seed=0, **kwargs):
-    """Runner wrapper for the prior-aware simulation engine."""
-    schedule = make_noise_schedule(kwargs["noise_mode"], kwargs)
+    """Runner wrapper for the prior-aware simulation engine.
+
+    If ``sigma`` is provided in kwargs it is used as the per-step Langevin
+    diffusion noise (the stochastic force), while ``sigma0`` remains the
+    one-shot encoding noise applied at memory insertion.
+    """
+    # Build the noise schedule from sigma (per-step noise), not sigma0.
+    schedule_params = dict(kwargs)
+    if "sigma" in kwargs:
+        schedule_params["sigma0"] = kwargs["sigma"]
+    schedule = make_noise_schedule(kwargs["noise_mode"], schedule_params)
     core_kwargs = filter_kwargs_for_core_prior(kwargs)
     return run_model_core_prior(
         **core_kwargs,
