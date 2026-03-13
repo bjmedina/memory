@@ -251,6 +251,11 @@ def evaluate_sigma_on_toy_experiments(
     sigmas = dict(fixed_sigmas)
     sigmas[sigma_name] = sigma_value
 
+    # Forward non-three-regime params (e.g. "sigma", "drift_step_size")
+    _STANDARD_KEYS = {"sigma0", "sigma1", "sigma2"}
+    _extra_from_sigmas = {k: v for k, v in sigmas.items() if k not in _STANDARD_KEYS}
+    extra_runner_kwargs = {**extra_runner_kwargs, **_extra_from_sigmas}
+
     dprime_by_isi = {}
     mse_by_isi = {}
     auc_by_isi = {}
@@ -366,6 +371,11 @@ def evaluate_sigma_on_toy_experiments_sample(
 
     sigmas = dict(fixed_sigmas)
     sigmas[sigma_name] = sigma_value
+
+    # Forward non-three-regime params (e.g. "sigma", "drift_step_size")
+    _STANDARD_KEYS = {"sigma0", "sigma1", "sigma2"}
+    _extra_from_sigmas = {k: v for k, v in sigmas.items() if k not in _STANDARD_KEYS}
+    extra_runner_kwargs = {**extra_runner_kwargs, **_extra_from_sigmas}
 
     dprime_by_isi = {}
     mse_by_isi = {}
@@ -1193,6 +1203,11 @@ def evaluate_sigma_on_multi_isi_sequences_sample(
     sigmas = dict(fixed_sigmas)
     sigmas[sigma_name] = sigma_value
 
+    # Forward non-three-regime params (e.g. "sigma", "drift_step_size")
+    _STANDARD_KEYS = {"sigma0", "sigma1", "sigma2"}
+    _extra_from_sigmas = {k: v for k, v in sigmas.items() if k not in _STANDARD_KEYS}
+    extra_runner_kwargs = {**extra_runner_kwargs, **_extra_from_sigmas}
+
     # Pre-compute trial ISIs for each sequence
     seq_trial_isis = [infer_trial_isis(seq) for seq in experiment_list]
 
@@ -1349,6 +1364,11 @@ def evaluate_sigma_on_multi_isi_sequences(
     """
     sigmas = dict(fixed_sigmas)
     sigmas[sigma_name] = sigma_value
+
+    # Forward non-three-regime params (e.g. "sigma", "drift_step_size")
+    _STANDARD_KEYS = {"sigma0", "sigma1", "sigma2"}
+    _extra_from_sigmas = {k: v for k, v in sigmas.items() if k not in _STANDARD_KEYS}
+    extra_runner_kwargs = {**extra_runner_kwargs, **_extra_from_sigmas}
 
     # Pre-compute trial ISIs for each sequence
     seq_trial_isis = [infer_trial_isis(seq) for seq in experiment_list]
