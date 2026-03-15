@@ -1,6 +1,10 @@
 """
 utls.sigma_fitting_2d — parameter sweep utilities for the 2D sandbox.
 
+Uses the two-parameter noise model:
+  - σ₀ : encoding noise (applied once at memory insertion)
+  - σ  : diffusive noise (constant per-step noise during Langevin dynamics)
+
 Pure exploration: sweep each parameter over a grid, record the resulting
 d' curves.  No target-based fitting — the goal is to understand how
 model behavior changes as a function of each parameter.
@@ -23,7 +27,6 @@ def sweep_param(
     param_name,
     param_values,
     fixed_params,
-    t_step=5,
     isi_values=(0, 1, 2, 4, 8, 16, 32, 64),
     n_experiments=20,
     k_stimuli=10,
@@ -36,12 +39,11 @@ def sweep_param(
     Parameters
     ----------
     param_name : str
-        One of ``"sigma0"``, ``"sigma1"``, ``"sigma2"``,
-        ``"drift_step_size"``.
+        One of ``"sigma0"``, ``"sigma"``, ``"drift_step_size"``.
     param_values : sequence of float
         Values to evaluate.
     fixed_params : dict
-        Keys ``sigma0``, ``sigma1``, ``sigma2``, ``drift_step_size``
+        Keys ``sigma0``, ``sigma``, ``drift_step_size``
         (all required except the one being swept).
 
     Returns
@@ -60,14 +62,12 @@ def sweep_param(
 
         sweep = run_2d_isi_sweep(
             sigma0=params["sigma0"],
-            sigma1=params["sigma1"],
-            sigma2=params["sigma2"],
+            sigma=params["sigma"],
             drift_step_size=params["drift_step_size"],
             score_model=score_model,
             X0=X0,
             name_to_idx=name_to_idx,
             stimulus_pool=stimulus_pool,
-            t_step=t_step,
             isi_values=isi_values,
             n_experiments=n_experiments,
             k_stimuli=k_stimuli,
@@ -104,7 +104,6 @@ def sweep_with_refinement(
     fixed_params,
     n_grid=15,
     n_refine_iters=2,
-    t_step=5,
     isi_values=(0, 1, 2, 4, 8, 16, 32, 64),
     n_mc=16,
     seed=42,
@@ -140,7 +139,6 @@ def sweep_with_refinement(
             param_name=param_name,
             param_values=grid,
             fixed_params=fixed_params,
-            t_step=t_step,
             isi_values=isi_values,
             n_mc=n_mc,
             seed=seed + it * 1000,
@@ -177,11 +175,10 @@ def staged_sweep_2d(
     n_grid=15,
     n_refine_iters=2,
     n_mc=16,
-    t_step=5,
     seed=42,
     verbose=True,
 ):
-    """Staged parameter sweep: sigma0 → sigma1 → drift_step_size.
+    """Staged parameter sweep: σ₀ → σ → drift_step_size.
 
     Each stage sweeps one parameter, auto-selects a moderate value,
     then fixes it for the next stage.
@@ -190,7 +187,7 @@ def staged_sweep_2d(
     -------
     dict
         ``sweep_sigma0`` : DataFrame
-        ``sweep_sigma1`` : DataFrame
+        ``sweep_sigma``  : DataFrame
         ``sweep_drift``  : DataFrame
         ``selected``     : dict of auto-selected parameter values
     """
@@ -208,11 +205,10 @@ def staged_sweep_2d(
         stimulus_pool=stimulus_pool,
         param_name="sigma0",
         bounds=sigma0_bounds,
-        fixed_params={"sigma0": 0.1, "sigma1": 0.0, "sigma2": 0.0,
+        fixed_params={"sigma0": 0.1, "sigma": 0.0,
                        "drift_step_size": 0.0},
         n_grid=n_grid,
         n_refine_iters=n_refine_iters,
-        t_step=t_step,
         isi_values=(0,),
         n_mc=n_mc,
         seed=seed,
@@ -222,33 +218,30 @@ def staged_sweep_2d(
     if verbose:
         print(f"→ Selected sigma0 = {best_s0:.4g}\n")
 
-    # Stage B: sweep sigma1 at ISI 1-4
+    # Stage B: sweep sigma (diffusive noise) at ISI 1-4
     if verbose:
         print("=" * 60)
-        print("Stage B: sweep sigma1 (ISI 1,2,4)")
+        print("Stage B: sweep sigma (ISI 1,2,4)")
         print("=" * 60)
-    df_s1, best_s1 = sweep_with_refinement(
+    df_s, best_s = sweep_with_refinement(
         score_model=score_model,
         X0=X0,
         name_to_idx=name_to_idx,
         stimulus_pool=stimulus_pool,
-        param_name="sigma1",
+        param_name="sigma",
         bounds=sigma_bounds,
-        fixed_params={"sigma0": best_s0, "sigma1": 0.0, "sigma2": 0.0,
+        fixed_params={"sigma0": best_s0, "sigma": 0.0,
                        "drift_step_size": 0.0},
         n_grid=n_grid,
         n_refine_iters=n_refine_iters,
-        t_step=t_step,
         isi_values=(1, 2, 4),
         n_mc=n_mc,
         seed=seed + 100,
         verbose=verbose,
     )
-    selected["sigma1"] = best_s1
-    # Use sigma1 as sigma2 baseline too
-    selected["sigma2"] = best_s1
+    selected["sigma"] = best_s
     if verbose:
-        print(f"→ Selected sigma1 = {best_s1:.4g}\n")
+        print(f"→ Selected sigma = {best_s:.4g}\n")
 
     # Stage C: sweep drift_step_size at ISI 8-64
     if verbose:
@@ -262,11 +255,10 @@ def staged_sweep_2d(
         stimulus_pool=stimulus_pool,
         param_name="drift_step_size",
         bounds=drift_bounds,
-        fixed_params={"sigma0": best_s0, "sigma1": best_s1,
-                       "sigma2": best_s1, "drift_step_size": 0.0},
+        fixed_params={"sigma0": best_s0, "sigma": best_s,
+                       "drift_step_size": 0.0},
         n_grid=n_grid,
         n_refine_iters=n_refine_iters,
-        t_step=t_step,
         isi_values=(8, 16, 32, 64),
         n_mc=n_mc,
         seed=seed + 200,
@@ -279,7 +271,7 @@ def staged_sweep_2d(
 
     return {
         "sweep_sigma0": df_s0,
-        "sweep_sigma1": df_s1,
+        "sweep_sigma": df_s,
         "sweep_drift": df_drift,
         "selected": selected,
     }

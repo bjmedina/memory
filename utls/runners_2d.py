@@ -1,18 +1,28 @@
 """
 utls.runners_2d — 2D guided-drift simulation engine for the mechanistic sandbox.
 
-Direct mirror of ``run_model_core_prior`` from ``utls/runners_v2.py``,
-simplified to the 2D analytic-prior setting (no item-score / binary modes).
+Implements the two-parameter noise model from the paper:
+  - σ₀ : encoding noise (applied once at memory insertion)
+  - σ  : diffusive noise (constant per-step noise during Langevin dynamics)
+
+This is intentionally simpler than the three-regime model in runners_v2.py.
 """
 
 import numpy as np
 import torch
 from collections import defaultdict
 
-from utls.runners_v2 import compute_score, ThreeRegimeNoise
+from utls.runners_v2 import compute_score
 from utls.toy_experiments import make_toy_experiment_list
 from utls.roc_utils import roc_from_arrays
 from utls.analysis_helpers import auroc_to_dprime, bootstrap_dprime_ci
+
+
+def _constant_noise_schedule(sigma):
+    """Return a noise schedule that returns *sigma* regardless of age."""
+    def schedule(age):
+        return sigma
+    return schedule
 
 
 # ── core simulation engine ────────────────────────────────────────────
@@ -199,14 +209,12 @@ def run_experiment_scores_2d(debug=False, seed=0, **kwargs):
 
 def run_2d_isi_sweep(
     sigma0,
-    sigma1,
-    sigma2,
+    sigma,
     drift_step_size,
     score_model,
     X0,
     name_to_idx,
     stimulus_pool,
-    t_step=5,
     isi_values=(0, 1, 2, 4, 8, 16, 32, 64),
     n_experiments=20,
     k_stimuli=10,
@@ -218,15 +226,13 @@ def run_2d_isi_sweep(
     Parameters
     ----------
     sigma0 : float
-        Encoding noise.
-    sigma1, sigma2 : float
-        Per-step drift noise (short / long range).
+        Encoding noise (applied once at memory insertion).
+    sigma : float
+        Diffusive noise (constant per-step noise during Langevin dynamics).
     drift_step_size : float
-        Prior-driven drift magnitude.
+        Prior-driven drift magnitude (η in the paper).
     score_model : ScoreAdapter2D
     X0, name_to_idx, stimulus_pool : as from ``make_2d_grid_stimuli``.
-    t_step : int
-        Age threshold between sigma1 and sigma2 regimes.
     isi_values : tuple of int
         ISI conditions to evaluate.
     n_experiments : int
@@ -246,7 +252,7 @@ def run_2d_isi_sweep(
         ``auroc``       : list[float]
         ``raw_runs``    : dict[int, dict]  (per-ISI aggregated run data)
     """
-    schedule = ThreeRegimeNoise(sigma0, sigma1, sigma2, t_step)
+    schedule = _constant_noise_schedule(sigma)
     results_isi = []
     results_dprime_mean = []
     results_dprime_sem = []
