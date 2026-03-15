@@ -15,13 +15,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.model.analytic_gmm_2d import AnalyticGMM2D, make_default_gmm
 from src.model.score_adapter_2d import ScoreAdapter2D
 from utls.sandbox_2d_data import make_2d_grid_stimuli, compute_geometry_descriptors
-from utls.runners_2d import run_model_core_2d, run_2d_isi_sweep, _constant_noise_schedule
+from utls.runners_2d import run_model_core_2d, run_2d_isi_sweep
 
 
 # ── 1. Finite-difference score check ─────────────────────────────────
 
 def test_finite_diff_score():
-    """Analytic score matches finite-difference ∇log p(x) at random points."""
+    """Analytic score matches finite-difference nabla log p(x) at random points."""
     gmm = make_default_gmm()
     rng = np.random.default_rng(123)
     eps = 1e-5
@@ -53,18 +53,18 @@ def test_score_adapter_shapes():
     gmm = make_default_gmm()
     adapter = ScoreAdapter2D(gmm, normalize=True)
 
-    # [D] → [D]
+    # [D] -> [D]
     x1d = torch.tensor([1.0, -1.0])
     s1d = adapter.forward(x1d)
     assert s1d.shape == (2,), f"Expected (2,), got {s1d.shape}"
     assert torch.isfinite(s1d).all()
 
-    # [B, D] → [B, D]
+    # [B, D] -> [B, D]
     x2d = torch.randn(5, 2)
     s2d = adapter.forward(x2d)
     assert s2d.shape == (5, 2), f"Expected (5, 2), got {s2d.shape}"
 
-    # [B, 1, 1, D] → [B, 1, 1, D]
+    # [B, 1, 1, D] -> [B, 1, 1, D]
     x4d = torch.randn(3, 1, 1, 2)
     s4d = adapter.forward(x4d)
     assert s4d.shape == (3, 1, 1, 2), f"Expected (3, 1, 1, 2), got {s4d.shape}"
@@ -91,21 +91,22 @@ def test_reproducibility_with_seeds():
     gmm = make_default_gmm()
     adapter = ScoreAdapter2D(gmm)
     X0, name_to_idx, pool = make_2d_grid_stimuli()
-    schedule = _constant_noise_schedule(0.1)
 
-    from utls.toy_experiments import make_toy_experiment_list
-    exp = make_toy_experiment_list(pool, isi=2, n_experiments=5,
-                                   k_stimuli=8, seed=99)
+    from utls.toy_experiments import make_high_diversity_sequences
+    exp_list, _ = make_high_diversity_sequences(
+        pool, isi_values=[1, 2], n_sequences=3, length=42,
+        min_pairs_per_isi=3, seed=99,
+    )
 
     out1 = run_model_core_2d(
-        sigma0=0.5, X0=X0, name_to_idx=name_to_idx,
-        experiment_list=exp, score_model=adapter,
-        drift_step_size=0.01, noise_schedule=schedule, seed=42,
+        sigma0=0.5, sigma=0.1, X0=X0, name_to_idx=name_to_idx,
+        experiment_list=exp_list, score_model=adapter,
+        drift_step_size=0.01, metric="cosine", seed=42,
     )
     out2 = run_model_core_2d(
-        sigma0=0.5, X0=X0, name_to_idx=name_to_idx,
-        experiment_list=exp, score_model=adapter,
-        drift_step_size=0.01, noise_schedule=schedule, seed=42,
+        sigma0=0.5, sigma=0.1, X0=X0, name_to_idx=name_to_idx,
+        experiment_list=exp_list, score_model=adapter,
+        drift_step_size=0.01, metric="cosine", seed=42,
     )
 
     np.testing.assert_array_equal(out1["hits"], out2["hits"])
@@ -123,9 +124,9 @@ def test_no_nans():
     sweep = run_2d_isi_sweep(
         sigma0=0.5, sigma=0.1, drift_step_size=0.01,
         score_model=adapter, X0=X0, name_to_idx=name_to_idx,
-        stimulus_pool=pool,
-        isi_values=(0, 1, 2, 4), n_experiments=10,
-        k_stimuli=8, n_mc=4, seed=42,
+        stimulus_pool=pool, metric="cosine",
+        isi_values=(1, 2, 4, 8), n_mc=4, seed=42,
+        n_sequences=5, seq_length=42, min_pairs_per_isi=3,
     )
 
     dprimes = np.array(sweep["dprime_mean"])
@@ -139,7 +140,7 @@ def test_log_prob_normalization():
     """GMM integrates to approximately 1 via numerical quadrature."""
     gmm = make_default_gmm()
 
-    # Dense grid over [-8, 8]² (wide enough to capture tails)
+    # Dense grid over [-8, 8]^2 (wide enough to capture tails)
     n = 200
     xs = np.linspace(-8, 8, n)
     dx = xs[1] - xs[0]
@@ -164,16 +165,17 @@ def test_runner_output_format():
     gmm = make_default_gmm()
     adapter = ScoreAdapter2D(gmm)
     X0, name_to_idx, pool = make_2d_grid_stimuli()
-    schedule = _constant_noise_schedule(0.1)
 
-    from utls.toy_experiments import make_toy_experiment_list
-    exp = make_toy_experiment_list(pool, isi=1, n_experiments=3,
-                                   k_stimuli=5, seed=0)
+    from utls.toy_experiments import make_high_diversity_sequences
+    exp_list, _ = make_high_diversity_sequences(
+        pool, isi_values=[1, 2], n_sequences=3, length=42,
+        min_pairs_per_isi=3, seed=0,
+    )
 
     out = run_model_core_2d(
-        sigma0=0.5, X0=X0, name_to_idx=name_to_idx,
-        experiment_list=exp, score_model=adapter,
-        drift_step_size=0.0, noise_schedule=schedule, seed=0,
+        sigma0=0.5, sigma=0.1, X0=X0, name_to_idx=name_to_idx,
+        experiment_list=exp_list, score_model=adapter,
+        drift_step_size=0.0, metric="cosine", seed=0,
     )
 
     expected_keys = {"hits", "fas", "isi_hit_dists", "fa_by_t",

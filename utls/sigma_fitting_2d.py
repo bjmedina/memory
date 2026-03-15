@@ -28,8 +28,10 @@ def sweep_param(
     param_values,
     fixed_params,
     isi_values=(0, 1, 2, 4, 8, 16, 32, 64),
-    n_experiments=20,
-    k_stimuli=10,
+    metric="cosine",
+    n_sequences=10,
+    seq_length=69,
+    min_pairs_per_isi=3,
     n_mc=16,
     seed=42,
     verbose=True,
@@ -69,8 +71,10 @@ def sweep_param(
             name_to_idx=name_to_idx,
             stimulus_pool=stimulus_pool,
             isi_values=isi_values,
-            n_experiments=n_experiments,
-            k_stimuli=k_stimuli,
+            metric=metric,
+            n_sequences=n_sequences,
+            seq_length=seq_length,
+            min_pairs_per_isi=min_pairs_per_isi,
             n_mc=n_mc,
             seed=seed + i * 7,
         )
@@ -105,6 +109,7 @@ def sweep_with_refinement(
     n_grid=15,
     n_refine_iters=2,
     isi_values=(0, 1, 2, 4, 8, 16, 32, 64),
+    metric="cosine",
     n_mc=16,
     seed=42,
     spacing="log",
@@ -140,6 +145,7 @@ def sweep_with_refinement(
             param_values=grid,
             fixed_params=fixed_params,
             isi_values=isi_values,
+            metric=metric,
             n_mc=n_mc,
             seed=seed + it * 1000,
             verbose=verbose,
@@ -172,13 +178,14 @@ def staged_sweep_2d(
     sigma0_bounds=(0.01, 5.0),
     sigma_bounds=(0.001, 2.0),
     drift_bounds=(0.0, 0.5),
+    metric="cosine",
     n_grid=15,
     n_refine_iters=2,
     n_mc=16,
     seed=42,
     verbose=True,
 ):
-    """Staged parameter sweep: σ₀ → σ → drift_step_size.
+    """Staged parameter sweep: sigma0 -> sigma -> drift_step_size.
 
     Each stage sweeps one parameter, auto-selects a moderate value,
     then fixes it for the next stage.
@@ -210,13 +217,14 @@ def staged_sweep_2d(
         n_grid=n_grid,
         n_refine_iters=n_refine_iters,
         isi_values=(0,),
+        metric=metric,
         n_mc=n_mc,
         seed=seed,
         verbose=verbose,
     )
     selected["sigma0"] = best_s0
     if verbose:
-        print(f"→ Selected sigma0 = {best_s0:.4g}\n")
+        print(f"-> Selected sigma0 = {best_s0:.4g}\n")
 
     # Stage B: sweep sigma (diffusive noise) at ISI 1-4
     if verbose:
@@ -235,13 +243,14 @@ def staged_sweep_2d(
         n_grid=n_grid,
         n_refine_iters=n_refine_iters,
         isi_values=(1, 2, 4),
+        metric=metric,
         n_mc=n_mc,
         seed=seed + 100,
         verbose=verbose,
     )
     selected["sigma"] = best_s
     if verbose:
-        print(f"→ Selected sigma = {best_s:.4g}\n")
+        print(f"-> Selected sigma = {best_s:.4g}\n")
 
     # Stage C: sweep drift_step_size at ISI 8-64
     if verbose:
@@ -260,6 +269,7 @@ def staged_sweep_2d(
         n_grid=n_grid,
         n_refine_iters=n_refine_iters,
         isi_values=(8, 16, 32, 64),
+        metric=metric,
         n_mc=n_mc,
         seed=seed + 200,
         spacing="linear",
@@ -267,7 +277,7 @@ def staged_sweep_2d(
     )
     selected["drift_step_size"] = best_drift
     if verbose:
-        print(f"→ Selected drift_step_size = {best_drift:.4g}\n")
+        print(f"-> Selected drift_step_size = {best_drift:.4g}\n")
 
     return {
         "sweep_sigma0": df_s0,
