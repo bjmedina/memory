@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 import torch
 from collections import defaultdict
 
-from utls.runners_2d import run_model_core_2d, run_2d_isi_sweep, _constant_noise_schedule
-from utls.toy_experiments import make_toy_experiment_list
+from utls.runners_2d import run_model_core_2d, run_2d_isi_sweep
+from utls.toy_experiments import make_high_diversity_sequences
 from utls.roc_utils import roc_from_arrays
 from utls.analysis_helpers import auroc_to_dprime
 
@@ -46,15 +46,16 @@ def item_susceptibility_analysis(
     sigma0,
     sigma,
     drift_step_size,
+    metric="cosine",
     isi_values=(1, 4, 16, 64),
     n_mc=32,
     seed=42,
 ):
     """Per-item error analysis correlated with geometry descriptors.
 
-    For each ISI, runs Monte Carlo simulations, computes per-item
-    hit rates (fraction of times a repeat was correctly discriminated),
-    and merges with geometry descriptors.
+    Runs Monte Carlo simulations with interleaved multi-ISI sequences,
+    computes per-item presentation counts, and merges with geometry
+    descriptors.
 
     Parameters
     ----------
@@ -62,63 +63,57 @@ def item_susceptibility_analysis(
         Encoding noise.
     sigma : float
         Diffusive noise (constant per step).
+    metric : str
+        Distance metric (default ``"cosine"``).
 
     Returns
     -------
     pd.DataFrame
         One row per (point, ISI) with columns: ``point_id``, ``isi``,
-        ``n_presentations``, ``mean_score``, ``hit_rate``, plus all
-        geometry columns from *descriptors_df*.
+        ``n_presentations``, plus all geometry columns from *descriptors_df*.
     """
-    schedule = _constant_noise_schedule(sigma)
+    # Generate interleaved multi-ISI sequences
+    max_isi = max(isi_values)
+    seq_length = max(max_isi + 5, 42)
+    # Round up to nearest multiple of 3
+    seq_length = ((seq_length + 2) // 3) * 3
+
+    exp_list, isi_keys = make_high_diversity_sequences(
+        stimulus_pool=stimulus_pool,
+        isi_values=list(isi_values),
+        n_sequences=10,
+        length=seq_length,
+        min_pairs_per_isi=3,
+        seed=seed,
+    )
+
     rows = []
 
-    for isi in isi_values:
-        exp_list = make_toy_experiment_list(
-            stimulus_pool, isi=isi,
-            n_experiments=30, k_stimuli=min(20, len(stimulus_pool)),
-            seed=seed + isi,
+    for rep in range(n_mc):
+        run_out = run_model_core_2d(
+            sigma0=sigma0,
+            sigma=sigma,
+            X0=X0,
+            name_to_idx=name_to_idx,
+            experiment_list=exp_list,
+            score_model=score_model,
+            drift_step_size=drift_step_size,
+            metric=metric,
+            seed=seed * 10_000 + rep,
         )
 
-        # Collect per-item scores across MC reps
-        item_hits = defaultdict(list)
-        item_fas = defaultdict(list)
-
-        for rep in range(n_mc):
-            run_out = run_model_core_2d(
-                sigma0=sigma0,
-                X0=X0,
-                name_to_idx=name_to_idx,
-                experiment_list=exp_list,
-                score_model=score_model,
-                drift_step_size=drift_step_size,
-                noise_schedule=schedule,
-                seed=seed * 10_000 + isi * 1000 + rep,
-            )
-
-            # Parse per-item: for this ISI, which items were hits?
-            for seq in exp_list:
-                seen_in_seq = set()
-                idx_to_name = {v: k for k, v in name_to_idx.items()}
-                for pos, stim_name in enumerate(seq):
-                    if stim_name in seen_in_seq:
-                        # This is a repeat presentation
-                        item_hits[stim_name].append(1)  # placeholder
-                    seen_in_seq.add(stim_name)
-
-        # Use aggregate hit/FA scores to compute per-ISI discrimination
-        all_hits = np.array([s for s, _ in run_out["isi_hit_dists"].get(isi, [])], float) \
-            if isi in run_out["isi_hit_dists"] else np.array([])
-        all_fas = run_out["fas"]
-
-        # For item-level: count presentations per item across experiments
+    # For item-level: count presentations per item across experiments
+    for isi in isi_values:
         item_count = defaultdict(int)
         for seq in exp_list:
-            seen = set()
-            for stim in seq:
+            seen = {}
+            for pos, stim in enumerate(seq):
                 if stim in seen:
-                    item_count[stim] += 1
-                seen.add(stim)
+                    actual_isi = pos - seen[stim] - 1
+                    if actual_isi == isi:
+                        item_count[stim] += 1
+                else:
+                    seen[stim] = pos
 
         for pt_id in stimulus_pool:
             n_pres = item_count.get(pt_id, 0)
@@ -147,9 +142,8 @@ def prior_mismatch_benchmark(
     sigma0,
     sigma,
     drift_step_size,
+    metric="cosine",
     isi_values=(0, 1, 2, 4, 8, 16, 32, 64),
-    n_experiments=20,
-    k_stimuli=10,
     n_mc=16,
     seed=42,
 ):
@@ -163,6 +157,8 @@ def prior_mismatch_benchmark(
         Encoding noise.
     sigma : float
         Diffusive noise (constant per step).
+    metric : str
+        Distance metric (default ``"cosine"``).
 
     Returns
     -------
@@ -183,8 +179,7 @@ def prior_mismatch_benchmark(
             name_to_idx=name_to_idx,
             stimulus_pool=stimulus_pool,
             isi_values=isi_values,
-            n_experiments=n_experiments,
-            k_stimuli=k_stimuli,
+            metric=metric,
             n_mc=n_mc,
             seed=seed,
         )
