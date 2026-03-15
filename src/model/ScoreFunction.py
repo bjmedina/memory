@@ -55,14 +55,15 @@ def parse(d):
 
 
 class ScoreFunction():
-    def __init__(self, 
+    def __init__(self,
                  mode = 'textures',
                  restart = False,
                  likelihood_eval = True,
                  sample = False,
                  train = False,
-                 config="/om2/user/bjmedina/auditory-memory/memory/assets/bryan.yaml", 
-                 device='cpu'):
+                 config="/om2/user/bjmedina/auditory-memory/memory/assets/bryan.yaml",
+                 device='cpu',
+                 normalize=True):
 
 
         self.mode = mode
@@ -72,6 +73,7 @@ class ScoreFunction():
         self.train = train
         self.device = device
         self.config = config
+        self.normalize = normalize
 
         df = yaml.safe_load(open(self.config))
 
@@ -116,12 +118,12 @@ class ScoreFunction():
         with torch.no_grad():
             score = self.score_model(x4, t)  # shape: [B, 1, 1, D] (assumed)
 
-        # Flatten per-sample, normalize to unit L2, then reshape back
-        score_flat = score.reshape(B, -1)                       # [B, D]
-        norms = score_flat.norm(p=2, dim=1, keepdim=True) + 1e-8
-        unit_score_flat = score_flat / norms
-        unit_score = unit_score_flat.reshape_as(score)          # [B, 1, 1, D]
-        return unit_score
+        # Flatten per-sample, optionally normalize to unit L2, then reshape back
+        if self.normalize:
+            score_flat = score.reshape(B, -1)                       # [B, D]
+            norms = score_flat.norm(p=2, dim=1, keepdim=True) + 1e-8
+            score = (score_flat / norms).reshape_as(score)          # [B, 1, 1, D]
+        return score
 
     def forward_raw(self, x: torch.Tensor) -> torch.Tensor:
         """Return the raw (unnormalized) score ∇_x log p(x).
