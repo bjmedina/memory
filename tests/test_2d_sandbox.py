@@ -15,8 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.model.analytic_gmm_2d import AnalyticGMM2D, make_default_gmm
 from src.model.score_adapter_2d import ScoreAdapter2D
 from utls.sandbox_2d_data import make_2d_grid_stimuli, compute_geometry_descriptors
-from utls.runners_2d import run_model_core_2d, run_2d_isi_sweep
-from utls.runners_v2 import ThreeRegimeNoise
+from utls.runners_2d import run_model_core_2d, run_2d_isi_sweep, _constant_noise_schedule
 
 
 # ── 1. Finite-difference score check ─────────────────────────────────
@@ -92,7 +91,7 @@ def test_reproducibility_with_seeds():
     gmm = make_default_gmm()
     adapter = ScoreAdapter2D(gmm)
     X0, name_to_idx, pool = make_2d_grid_stimuli()
-    schedule = ThreeRegimeNoise(0.5, 0.1, 0.1, 5)
+    schedule = _constant_noise_schedule(0.1)
 
     from utls.toy_experiments import make_toy_experiment_list
     exp = make_toy_experiment_list(pool, isi=2, n_experiments=5,
@@ -122,9 +121,9 @@ def test_no_nans():
     X0, name_to_idx, pool = make_2d_grid_stimuli()
 
     sweep = run_2d_isi_sweep(
-        sigma0=0.5, sigma1=0.1, sigma2=0.1, drift_step_size=0.01,
+        sigma0=0.5, sigma=0.1, drift_step_size=0.01,
         score_model=adapter, X0=X0, name_to_idx=name_to_idx,
-        stimulus_pool=pool, t_step=5,
+        stimulus_pool=pool,
         isi_values=(0, 1, 2, 4), n_experiments=10,
         k_stimuli=8, n_mc=4, seed=42,
     )
@@ -165,7 +164,7 @@ def test_runner_output_format():
     gmm = make_default_gmm()
     adapter = ScoreAdapter2D(gmm)
     X0, name_to_idx, pool = make_2d_grid_stimuli()
-    schedule = ThreeRegimeNoise(0.5, 0.1, 0.1, 5)
+    schedule = _constant_noise_schedule(0.1)
 
     from utls.toy_experiments import make_toy_experiment_list
     exp = make_toy_experiment_list(pool, isi=1, n_experiments=3,

@@ -16,75 +16,29 @@ A 2D mechanistic sandbox replacing the learned high-dimensional prior with a ful
 
 80 grid points in [-4, 4]² (9×9 grid, truncated to 80). Points are *not* sampled from the GMM — they are fixed experimental stimuli on a regular grid.
 
-## Baseline Hyperparameters
+## Noise Model (Two-Parameter)
 
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| sigma0    | 0.5   | Encoding noise |
-| sigma1    | 0.1   | Short-range drift noise (ISI 1–4) |
-| sigma2    | 0.1   | Long-range drift noise (ISI 8–64) |
-| drift_step_size | 0.02 | Prior-driven drift magnitude |
-| t_step    | 5     | Regime boundary (sigma1 → sigma2) |
-| ISIs      | 0, 1, 2, 4, 8, 16, 32, 64 | |
+Following the paper's formulation (Equations 1–3):
 
-## Baseline d' vs ISI
+| Parameter | Symbol | Value | Description |
+|-----------|--------|-------|-------------|
+| Encoding noise | σ₀ | 0.5 | Applied once at memory insertion (Eq. 1) |
+| Diffusive noise | σ | 0.1 | Constant per-step noise during Langevin dynamics (Eq. 2) |
+| Drift step size | η | 0.02 | Prior-driven drift magnitude (Eq. 2) |
 
-| ISI | d' (mean ± SEM) |
-|-----|-----------------|
-| 0   | -0.096 ± 0.024  |
-| 1   |  0.826 ± 0.026  |
-| 2   |  0.978 ± 0.031  |
-| 4   |  1.035 ± 0.027  |
-| 8   |  1.581 ± 0.033  |
-| 16  |  1.292 ± 0.023  |
-| 32  |  1.115 ± 0.015  |
-| 64  |  0.918 ± 0.009  |
+**Encoding** (Eq. 1): m_i = x_i + σ₀ · s ⊙ ε
 
-![Baseline d' curve](figures/2d_sandbox/baseline_dprime_curve.png)
-
-## Ablation: Raw vs Unit-Normalised Score
-
-| ISI | Unit-norm d' | Raw d' |
-|-----|-------------|--------|
-| 0   | -0.096      | -0.097 |
-| 1   |  0.826      |  0.827 |
-| 2   |  0.978      |  0.989 |
-| 4   |  1.035      |  1.065 |
-| 8   |  1.581      |  1.645 |
-| 16  |  1.292      |  1.250 |
-| 32  |  1.115      |  0.892 |
-| 64  |  0.918      |  0.576 |
-
-The raw score shows stronger position-dependent drift, causing faster forgetting at long ISIs (d' drops to 0.576 at ISI=64 vs 0.918 for unit-norm). At shorter ISIs the difference is minimal.
-
-![Raw vs Unit Score](figures/2d_sandbox/raw_vs_unit_score.png)
-
-## Ablation: Matched vs Mismatched Prior
-
-| ISI | Matched d' | Mismatched d' |
-|-----|-----------|---------------|
-| 0   | -0.099    | -0.101        |
-| 1   |  0.828    |  0.824        |
-| 2   |  0.977    |  0.983        |
-| 4   |  1.034    |  1.036        |
-| 8   |  1.589    |  1.578        |
-| 16  |  1.293    |  1.289        |
-| 32  |  1.115    |  1.113        |
-| 64  |  0.920    |  0.925        |
-
-With the current drift_step_size (0.02), the mismatch effect is subtle. Larger drift magnitudes would amplify the difference, since the mismatched prior pulls memories toward wrong attractor regions.
-
-![Prior Mismatch](figures/2d_sandbox/prior_mismatch_dprime.png)
+**Per-trial update** (Eq. 2): m_j ← m_j + η · ∇ log π(m_j) + σ · s̃ ⊙ ε_j
 
 ## Key Insights
 
-1. **ISI=0 is near chance**: With sigma0=0.5, immediate repeats have encoding noise too large relative to the 2D signal, producing d' ≈ 0. This is a parameter regime where encoding noise dominates.
+1. **ISI=0 is near chance**: With σ₀=0.5, immediate repeats have encoding noise too large relative to the 2D signal, producing d' ≈ 0. This is a parameter regime where encoding noise dominates.
 
-2. **Performance peaks mid-range**: d' peaks at ISI=8 (1.58), suggesting a regime where prior-driven drift has had time to improve memory traces (pulling them toward high-density regions) but diffusion noise hasn't yet overwhelmed the benefit.
+2. **Performance peaks mid-range**: d' peaks around ISI=8, suggesting a regime where prior-driven drift has had time to improve memory traces (pulling them toward high-density regions) but diffusion noise hasn't yet overwhelmed the benefit.
 
 3. **Raw vs unit score diverges at long ISIs**: The raw score magnitude is position-dependent (larger far from modes), so points in low-density regions drift more aggressively under raw scoring. This causes faster forgetting at long delays. Unit-normalisation stabilises long-ISI performance.
 
-4. **Mismatch effect is drift-strength dependent**: At small drift_step_size, both correct and incorrect priors produce similar d' because drift barely moves memories. The mismatch ablation becomes informative at larger drift magnitudes.
+4. **Mismatch effect is drift-strength dependent**: At small η, both correct and incorrect priors produce similar d' because drift barely moves memories. The mismatch ablation becomes informative at larger drift magnitudes.
 
 5. **The sandbox is fully functional**: Score math is verified numerically, results are reproducible under fixed seeds, and all ISIs produce finite d' values.
 

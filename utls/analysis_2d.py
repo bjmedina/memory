@@ -11,8 +11,7 @@ import matplotlib.pyplot as plt
 import torch
 from collections import defaultdict
 
-from utls.runners_2d import run_model_core_2d, run_2d_isi_sweep
-from utls.runners_v2 import ThreeRegimeNoise
+from utls.runners_2d import run_model_core_2d, run_2d_isi_sweep, _constant_noise_schedule
 from utls.toy_experiments import make_toy_experiment_list
 from utls.roc_utils import roc_from_arrays
 from utls.analysis_helpers import auroc_to_dprime
@@ -45,10 +44,8 @@ def item_susceptibility_analysis(
     stimulus_pool,
     descriptors_df,
     sigma0,
-    sigma1,
-    sigma2,
+    sigma,
     drift_step_size,
-    t_step=5,
     isi_values=(1, 4, 16, 64),
     n_mc=32,
     seed=42,
@@ -59,6 +56,13 @@ def item_susceptibility_analysis(
     hit rates (fraction of times a repeat was correctly discriminated),
     and merges with geometry descriptors.
 
+    Parameters
+    ----------
+    sigma0 : float
+        Encoding noise.
+    sigma : float
+        Diffusive noise (constant per step).
+
     Returns
     -------
     pd.DataFrame
@@ -66,7 +70,7 @@ def item_susceptibility_analysis(
         ``n_presentations``, ``mean_score``, ``hit_rate``, plus all
         geometry columns from *descriptors_df*.
     """
-    schedule = ThreeRegimeNoise(sigma0, sigma1, sigma2, t_step)
+    schedule = _constant_noise_schedule(sigma)
     rows = []
 
     for isi in isi_values:
@@ -141,10 +145,8 @@ def prior_mismatch_benchmark(
     name_to_idx,
     stimulus_pool,
     sigma0,
-    sigma1,
-    sigma2,
+    sigma,
     drift_step_size,
-    t_step=5,
     isi_values=(0, 1, 2, 4, 8, 16, 32, 64),
     n_experiments=20,
     k_stimuli=10,
@@ -157,6 +159,10 @@ def prior_mismatch_benchmark(
     ----------
     matched_gmm, mismatched_gmm : AnalyticGMM2D
         Correct and incorrect prior, respectively.
+    sigma0 : float
+        Encoding noise.
+    sigma : float
+        Diffusive noise (constant per step).
 
     Returns
     -------
@@ -170,14 +176,12 @@ def prior_mismatch_benchmark(
         adapter = ScoreAdapter2D(gmm, normalize=True)
         sweep = run_2d_isi_sweep(
             sigma0=sigma0,
-            sigma1=sigma1,
-            sigma2=sigma2,
+            sigma=sigma,
             drift_step_size=drift_step_size,
             score_model=adapter,
             X0=X0,
             name_to_idx=name_to_idx,
             stimulus_pool=stimulus_pool,
-            t_step=t_step,
             isi_values=isi_values,
             n_experiments=n_experiments,
             k_stimuli=k_stimuli,
