@@ -5,14 +5,10 @@ Implements the two-parameter noise model from the paper:
   - σ₀ : encoding noise (applied once at memory insertion)
   - σ  : diffusive noise (constant per-step noise during Langevin dynamics)
 
-Decision uses cumulative std: sqrt(σ₀²·rms_std² + age·σ²) so that
-older memories are properly down-weighted in the Mahalanobis metric.
-
 Uses ``make_high_diversity_sequences`` for properly interleaved
 experiment sequences (~50% repetition rate, mixed ISIs).
 """
 
-import math
 import numpy as np
 import torch
 from collections import defaultdict
@@ -80,10 +76,6 @@ def run_model_core_2d(
     rms_std = torch.sqrt(torch.mean(dim_std ** 2)).item()
     scaled_std = dim_std / rms_std
 
-    # Precompute encoding variance (averaged across dims) for cumulative std
-    encoding_var = (sigma0 * rms_std) ** 2
-    per_step_var = sigma ** 2
-
     hit_scores, fa_scores = [], []
     isi_hit_dists = defaultdict(list)
     T_max = max((len(seq) for seq in experiment_list), default=0)
@@ -103,17 +95,6 @@ def run_model_core_2d(
 
             # ---------- UPDATE MEMORIES ----------
             if memory_bank:
-                ages = [t - mem["t_inserted"] for mem in memory_bank]
-
-                # Cumulative std for each memory (for decision weighting)
-                cumulative_stds = [
-                    math.sqrt(encoding_var + age * per_step_var)
-                    for age in ages
-                ]
-
-                for age, cstd in zip(ages, cumulative_stds):
-                    stds_over_time.append((age, cstd))
-
                 # random noise (batched) — per-step σ
                 mu_dtype = memory_bank[0]["mu"].dtype
                 mu_device = memory_bank[0]["mu"].device
@@ -137,9 +118,9 @@ def run_model_core_2d(
                             mem["mu"]
                         )
 
-                # decision scores — use cumulative std
-                for mem, cstd in zip(memory_bank, cumulative_stds):
-                    score = compute_score(probe, mem["mu"], cstd, metric)
+                # decision scores
+                for mem in memory_bank:
+                    score = compute_score(probe, mem["mu"], sigma, metric)
                     scores.append(score)
 
             # ---------- DECISION STEP ----------
