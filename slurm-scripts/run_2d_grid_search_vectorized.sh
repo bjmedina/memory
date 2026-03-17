@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J 2d_grid_search
+#SBATCH -J 2d_grid_search_vec
 #SBATCH -p mcdermott
 #SBATCH -t 0-4:00:00
 #SBATCH -n 1
@@ -20,9 +20,9 @@ cd /om2/user/bjmedina/auditory-memory/memory || exit 1
 # (override via env vars when submitting)
 #
 # Examples:
-#   N_MC=50 ISIS="0 2 16" sbatch slurm-scripts/run_2d_grid_search.sh
-#   PARALLEL_MODE=flat sbatch --array=0-391 slurm-scripts/run_2d_grid_search.sh
-#   N_MC=100 METRIC=cosine SEED=123 sbatch slurm-scripts/run_2d_grid_search.sh
+#   N_MC=50 ISIS="0 2 16" sbatch slurm-scripts/run_2d_grid_search_vectorized.sh
+#   PARALLEL_MODE=flat sbatch --array=0-391 slurm-scripts/run_2d_grid_search_vectorized.sh
+#   N_MC=100 METRIC=cosine SEED=123 sbatch slurm-scripts/run_2d_grid_search_vectorized.sh
 # =============================
 
 N_MC=${N_MC:-10}
@@ -48,7 +48,7 @@ echo "======================================="
 # =============================
 # EXECUTION
 # =============================
-python src/model/run_2d_grid_search.py \
+python src/model/run_2d_grid_search_vectorized.py \
     --job-index "$SLURM_ARRAY_TASK_ID" \
     --parallel-mode "$PARALLEL_MODE" \
     --n-mc "$N_MC" \
