@@ -8,6 +8,15 @@ any configuration can be queried after the fact:
     python scripts/run_2d_grid_search.py --output-dir results/my_run
     python scripts/run_2d_grid_search.py --resume   # skip already-computed triples
 
+SLURM job-array mode (one triple per task):
+
+    python scripts/run_2d_grid_search.py --output-dir results/run \
+        --task-id $SLURM_ARRAY_TASK_ID --num-tasks 392
+
+Gather results after all array jobs finish:
+
+    python scripts/run_2d_grid_search.py --output-dir results/run --gather
+
 Output structure
 ----------------
 <output-dir>/
@@ -174,6 +183,93 @@ def run_single_triple(
     return triple_data, summary
 
 
+def make_csv_fields(isi_values):
+    """Build ordered CSV column names."""
+    fields = ["sigma0", "sigma", "eta", "n_fas", "fa_mean", "fa_std"]
+    for isi in isi_values:
+        fields.extend([
+            f"dprime_isi{isi}", f"auc_isi{isi}", f"dprime_sem_isi{isi}",
+            f"n_hits_isi{isi}", f"hit_mean_isi{isi}", f"hit_std_isi{isi}",
+        ])
+    return fields
+
+
+def gather_results(out_dir, per_triple_dir, sigma0_grid, sigma_grid,
+                   eta_grid, isi_values):
+    """Assemble per_triple/*.npz into master CSV and grid .npz."""
+    import re
+
+    csv_fields = make_csv_fields(isi_values)
+    csv_path = out_dir / "grid_search_master.csv"
+
+    # Build index maps for grid coordinates
+    s0_idx = {round(float(v), 6): i for i, v in enumerate(sigma0_grid)}
+    sig_idx = {round(float(v), 6): i for i, v in enumerate(sigma_grid)}
+    eta_idx = {round(float(v), 6): i for i, v in enumerate(eta_grid)}
+
+    dprime_arrays = {
+        isi: np.full((len(sigma0_grid), len(sigma_grid), len(eta_grid)), np.nan)
+        for isi in isi_values
+    }
+
+    npz_files = sorted(per_triple_dir.glob("s0=*.npz"))
+    print(f"Gathering {len(npz_files)} per-triple .npz files from {per_triple_dir}")
+
+    rows = []
+    for fpath in npz_files:
+        data = np.load(fpath, allow_pickle=True)
+        s0 = float(data["sigma0"])
+        sig = float(data["sigma"])
+        eta = float(data["eta"])
+
+        row = {
+            "sigma0": s0, "sigma": sig, "eta": eta,
+            "n_fas": int(data["n_fas"]),
+            "fa_mean": float(data["fa_mean"]),
+            "fa_std": float(data["fa_std"]),
+        }
+        for isi in isi_values:
+            for key in ["dprime", "auc", "dprime_sem", "n_hits", "hit_mean", "hit_std"]:
+                k = f"{key}_isi{isi}"
+                row[k] = float(data[k]) if k in data else np.nan
+
+        rows.append(row)
+
+        # Fill 3-D arrays
+        i_s0 = s0_idx.get(round(s0, 6))
+        i_sig = sig_idx.get(round(sig, 6))
+        i_eta = eta_idx.get(round(eta, 6))
+        if i_s0 is not None and i_sig is not None and i_eta is not None:
+            for isi in isi_values:
+                k = f"dprime_isi{isi}"
+                if k in data:
+                    dprime_arrays[isi][i_s0, i_sig, i_eta] = float(data[k])
+
+    # Write CSV
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=csv_fields)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+    # Write grid .npz
+    npz_path = out_dir / "grid_search_results.npz"
+    np.savez(
+        npz_path,
+        sigma0_grid=sigma0_grid,
+        sigma_grid=sigma_grid,
+        eta_grid=eta_grid,
+        isi_values=np.array(isi_values),
+        **{f"dprime_isi{isi}": dprime_arrays[isi] for isi in isi_values},
+    )
+
+    total = len(sigma0_grid) * len(sigma_grid) * len(eta_grid)
+    print(f"  CSV:       {csv_path}  ({len(rows)} rows)")
+    print(f"  Grid .npz: {npz_path}")
+    if len(rows) < total:
+        print(f"  WARNING: only {len(rows)}/{total} triples found")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run 2D parameter grid search with comprehensive output."
@@ -202,6 +298,19 @@ def main():
         "--eta-grid", type=float, nargs="+", default=DEFAULT_ETA,
         help="η values to sweep.",
     )
+    # ── SLURM job-array support ──────────────────────────────────────
+    parser.add_argument(
+        "--task-id", type=int, default=None,
+        help="Run only this triple index (0-based). For SLURM --array jobs.",
+    )
+    parser.add_argument(
+        "--num-tasks", type=int, default=None,
+        help="Expected total number of tasks (for validation).",
+    )
+    parser.add_argument(
+        "--gather", action="store_true",
+        help="Gather per_triple/*.npz into master CSV + grid .npz (no simulation).",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -214,7 +323,76 @@ def main():
     eta_grid = np.array(args.eta_grid)
     total = len(sigma0_grid) * len(sigma_grid) * len(eta_grid)
 
-    print(f"Grid: {len(sigma0_grid)} × {len(sigma_grid)} × {len(eta_grid)} = {total} triples")
+    ISI_VALUES = (0, 2, 16)
+    METRIC = "cosine"
+
+    # ── gather mode ──────────────────────────────────────────────────
+    if args.gather:
+        gather_results(out_dir, per_triple_dir, sigma0_grid, sigma_grid,
+                       eta_grid, ISI_VALUES)
+        return
+
+    # ── build flat list of triples (deterministic order) ─────────────
+    all_triples = [
+        (i_s0, i_sig, i_eta, s0, sig, eta)
+        for i_s0, s0 in enumerate(sigma0_grid)
+        for i_sig, sig in enumerate(sigma_grid)
+        for i_eta, eta in enumerate(eta_grid)
+    ]
+    assert len(all_triples) == total
+
+    # ── single-task mode (SLURM job array) ───────────────────────────
+    if args.task_id is not None:
+        if args.num_tasks is not None and args.num_tasks != total:
+            print(f"WARNING: --num-tasks {args.num_tasks} != grid size {total}")
+        if args.task_id < 0 or args.task_id >= total:
+            print(f"ERROR: --task-id {args.task_id} out of range [0, {total})")
+            sys.exit(1)
+
+        i_s0, i_sig, i_eta, s0, sig, eta = all_triples[args.task_id]
+        fname = triple_filename(s0, sig, eta)
+        fpath = per_triple_dir / fname
+
+        if args.resume and fpath.exists():
+            print(f"Task {args.task_id}: {fname} already exists, skipping.")
+            return
+
+        print(f"Task {args.task_id}/{total}: s0={s0:.3f} sig={sig:.3f} eta={eta:.3f}")
+        print(f"MC reps: {args.n_mc}  |  seed: {args.seed}")
+
+        # Setup
+        gmm = make_default_gmm()
+        X0, name_to_idx, stimulus_pool = make_2d_grid_stimuli()
+        adapter = ScoreAdapter2D(gmm, normalize=True)
+        experiment_list, _ = make_high_diversity_sequences(
+            stimulus_pool=stimulus_pool,
+            isi_values=list(ISI_VALUES),
+            n_sequences=10, length=81,
+            min_pairs_per_isi=5, seed=args.seed,
+        )
+
+        t0 = time.time()
+        triple_data, summary = run_single_triple(
+            s0, sig, eta,
+            X0=X0, name_to_idx=name_to_idx,
+            experiment_list=experiment_list, adapter=adapter,
+            isi_values=ISI_VALUES, n_mc=args.n_mc,
+            seed=args.seed, metric=METRIC,
+        )
+        np.savez(fpath, **triple_data)
+
+        elapsed = time.time() - t0
+        print(
+            f"  d'(0)={summary.get('dprime_isi0', float('nan')):.2f}  "
+            f"d'(2)={summary.get('dprime_isi2', float('nan')):.2f}  "
+            f"d'(16)={summary.get('dprime_isi16', float('nan')):.2f}  "
+            f"[{elapsed:.1f}s]"
+        )
+        print(f"  Saved: {fpath}")
+        return
+
+    # ── sequential mode (original behavior) ──────────────────────────
+    print(f"Grid: {len(sigma0_grid)} x {len(sigma_grid)} x {len(eta_grid)} = {total} triples")
     print(f"MC reps: {args.n_mc}  |  seed: {args.seed}  |  output: {out_dir}")
     if args.resume:
         print("Resume mode: skipping existing per_triple/*.npz files")
@@ -224,9 +402,6 @@ def main():
     gmm = make_default_gmm()
     X0, name_to_idx, stimulus_pool = make_2d_grid_stimuli()
     adapter = ScoreAdapter2D(gmm, normalize=True)
-
-    ISI_VALUES = (0, 2, 16)
-    METRIC = "cosine"
 
     experiment_list, _ = make_high_diversity_sequences(
         stimulus_pool=stimulus_pool,
@@ -240,14 +415,7 @@ def main():
 
     # ── CSV setup ────────────────────────────────────────────────────
     csv_path = out_dir / "grid_search_master.csv"
-    csv_fields = [
-        "sigma0", "sigma", "eta", "n_fas", "fa_mean", "fa_std",
-    ]
-    for isi in ISI_VALUES:
-        csv_fields.extend([
-            f"dprime_isi{isi}", f"auc_isi{isi}", f"dprime_sem_isi{isi}",
-            f"n_hits_isi{isi}", f"hit_mean_isi{isi}", f"hit_std_isi{isi}",
-        ])
+    csv_fields = make_csv_fields(ISI_VALUES)
 
     # If resuming, load existing CSV rows to avoid duplicates
     existing_keys = set()
@@ -277,63 +445,61 @@ def main():
     skipped = 0
     t_start = time.time()
 
-    for i_s0, s0 in enumerate(sigma0_grid):
-        for i_sig, sig in enumerate(sigma_grid):
-            for i_eta, eta in enumerate(eta_grid):
-                count += 1
-                fname = triple_filename(s0, sig, eta)
-                fpath = per_triple_dir / fname
+    for i_s0, i_sig, i_eta, s0, sig, eta in all_triples:
+        count += 1
+        fname = triple_filename(s0, sig, eta)
+        fpath = per_triple_dir / fname
 
-                # Resume check
-                if args.resume and fpath.exists():
-                    # Load d' from existing file into arrays
-                    try:
-                        existing = np.load(fpath, allow_pickle=True)
-                        for isi in ISI_VALUES:
-                            key = f"dprime_isi{isi}"
-                            if key in existing:
-                                dprime_arrays[isi][i_s0, i_sig, i_eta] = float(existing[key])
-                    except Exception:
-                        pass
-                    skipped += 1
-                    continue
-
-                # Run simulation
-                triple_data, summary = run_single_triple(
-                    s0, sig, eta,
-                    X0=X0, name_to_idx=name_to_idx,
-                    experiment_list=experiment_list, adapter=adapter,
-                    isi_values=ISI_VALUES, n_mc=args.n_mc,
-                    seed=args.seed, metric=METRIC,
-                )
-
-                # Save per-triple .npz (crash-safe: write immediately)
-                np.savez(fpath, **triple_data)
-
-                # Write CSV row
-                writer.writerow(summary)
-                csv_file.flush()
-
-                # Update 3-D arrays
+        # Resume check
+        if args.resume and fpath.exists():
+            # Load d' from existing file into arrays
+            try:
+                existing = np.load(fpath, allow_pickle=True)
                 for isi in ISI_VALUES:
-                    dprime_arrays[isi][i_s0, i_sig, i_eta] = summary.get(
-                        f"dprime_isi{isi}", np.nan
-                    )
+                    key = f"dprime_isi{isi}"
+                    if key in existing:
+                        dprime_arrays[isi][i_s0, i_sig, i_eta] = float(existing[key])
+            except Exception:
+                pass
+            skipped += 1
+            continue
 
-                # Progress
-                done = count - skipped
-                elapsed = time.time() - t_start
-                rate = elapsed / max(done, 1)
-                remaining = rate * (total - count)
-                if done % 10 == 0 or done <= 3:
-                    print(
-                        f"  [{count}/{total}] "
-                        f"s0={s0:.3f} sig={sig:.3f} eta={eta:.3f}  "
-                        f"d'(0)={summary.get('dprime_isi0', float('nan')):.2f}  "
-                        f"d'(2)={summary.get('dprime_isi2', float('nan')):.2f}  "
-                        f"d'(16)={summary.get('dprime_isi16', float('nan')):.2f}  "
-                        f"[{elapsed:.0f}s elapsed, ~{remaining:.0f}s remaining]"
-                    )
+        # Run simulation
+        triple_data, summary = run_single_triple(
+            s0, sig, eta,
+            X0=X0, name_to_idx=name_to_idx,
+            experiment_list=experiment_list, adapter=adapter,
+            isi_values=ISI_VALUES, n_mc=args.n_mc,
+            seed=args.seed, metric=METRIC,
+        )
+
+        # Save per-triple .npz (crash-safe: write immediately)
+        np.savez(fpath, **triple_data)
+
+        # Write CSV row
+        writer.writerow(summary)
+        csv_file.flush()
+
+        # Update 3-D arrays
+        for isi in ISI_VALUES:
+            dprime_arrays[isi][i_s0, i_sig, i_eta] = summary.get(
+                f"dprime_isi{isi}", np.nan
+            )
+
+        # Progress
+        done = count - skipped
+        elapsed = time.time() - t_start
+        rate = elapsed / max(done, 1)
+        remaining = rate * (total - count)
+        if done % 10 == 0 or done <= 3:
+            print(
+                f"  [{count}/{total}] "
+                f"s0={s0:.3f} sig={sig:.3f} eta={eta:.3f}  "
+                f"d'(0)={summary.get('dprime_isi0', float('nan')):.2f}  "
+                f"d'(2)={summary.get('dprime_isi2', float('nan')):.2f}  "
+                f"d'(16)={summary.get('dprime_isi16', float('nan')):.2f}  "
+                f"[{elapsed:.0f}s elapsed, ~{remaining:.0f}s remaining]"
+            )
 
     csv_file.close()
 
