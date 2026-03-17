@@ -19,6 +19,42 @@ from utls.roc_utils import roc_from_arrays
 from utls.analysis_helpers import auroc_to_dprime, bootstrap_dprime_ci
 
 
+# ── batched scoring ───────────────────────────────────────────────────
+
+def compute_scores_batched(probe, mu_bank, n_mem, sigma, metric):
+    """Vectorised scoring: probe [1, D] vs mu_bank[:n_mem] [n_mem, D].
+
+    Returns a 1-D tensor of shape [n_mem].
+    """
+    mem = mu_bank[:n_mem]                                       # [n_mem, D]
+
+    if metric == "cosine":
+        probe_n = probe / (probe.norm() + 1e-12)               # [1, D]
+        mem_n = mem / (mem.norm(dim=1, keepdim=True) + 1e-12)   # [n_mem, D]
+        cos_sims = (probe_n * mem_n).sum(dim=1)                 # [n_mem]
+        return 1.0 - cos_sims
+
+    diff = probe - mem                                          # [n_mem, D]
+    sqdist = (diff ** 2).sum(dim=1)                             # [n_mem]
+
+    if metric == "euclidean":
+        return sqdist.sqrt()
+    elif metric == "manhattan":
+        return diff.abs().sum(dim=1)
+    elif metric == "mahalanobis":
+        return sqdist.sqrt() / sigma
+    elif metric == "loglikelihood":
+        D_dim = probe.shape[1]
+        var = sigma ** 2
+        return (
+            -0.5 * D_dim * np.log(2 * np.pi)
+            - D_dim * np.log(sigma)
+            - 0.5 * (sqdist / var)
+        )
+    else:
+        raise ValueError(f"Unknown metric '{metric}'")
+
+
 # ── core simulation engine ────────────────────────────────────────────
 
 def run_model_core_2d(
@@ -156,6 +192,119 @@ def run_model_core_2d(
         "fa_by_t": fa_by_t,
         "T_max": T_max,
         "stds_over_time": np.array(stds_over_time) if stds_over_time else np.empty((0, 2)),
+        "metric": metric,
+        "score_type": "likelihood" if metric == "loglikelihood" else "distance",
+    }
+
+
+# ── vectorised core simulation engine ─────────────────────────────────
+
+def run_model_core_2d_vec(
+    sigma0,
+    sigma,
+    *,
+    X0,
+    name_to_idx,
+    experiment_list,
+    score_model,
+    drift_step_size=0.0,
+    metric="cosine",
+    debug=False,
+    torch_rng=None,
+    seed=0,
+):
+    """Vectorised 2D guided-drift memory simulation.
+
+    Drop-in replacement for :func:`run_model_core_2d` with identical
+    outputs.  Replaces the per-memory Python loops with batched tensor
+    operations for noise, drift, and scoring.
+    """
+    if torch_rng is None:
+        torch_rng = torch.Generator(device=X0.device)
+        torch_rng.manual_seed(seed)
+
+    D = X0.shape[1]
+
+    dim_std = X0.std(0, unbiased=True)
+    rms_std = torch.sqrt(torch.mean(dim_std ** 2)).item()
+    scaled_std = dim_std / rms_std                              # [D]
+
+    hit_scores, fa_scores = [], []
+    isi_hit_dists = defaultdict(list)
+    T_max = max((len(seq) for seq in experiment_list), default=0)
+    fa_by_t = [[] for _ in range(T_max)]
+
+    for seq in experiment_list:
+        if not seq:
+            continue
+
+        seq_idx = [name_to_idx[f] for f in seq]
+        seq_len = len(seq_idx)
+
+        # Pre-allocated memory bank: [seq_len, D]
+        mu_bank = torch.zeros(seq_len, D, device=X0.device, dtype=X0.dtype)
+        n_mem = 0
+        seen, last_seen = set(), {}
+
+        for t, incoming in enumerate(seq_idx, start=1):
+            probe = X0[incoming].view(1, -1)                    # [1, D]
+
+            # ---------- UPDATE + SCORE MEMORIES ----------
+            if n_mem > 0:
+                # diffusive noise (batched)
+                noise = torch.randn(
+                    n_mem, D,
+                    device=X0.device, dtype=X0.dtype,
+                    generator=torch_rng,
+                )
+                mu_bank[:n_mem] += noise * (sigma * scaled_std)
+
+                # prior-driven drift (batched)
+                if drift_step_size > 0:
+                    with torch.no_grad():
+                        drift = score_model.forward(mu_bank[:n_mem])
+                    mu_bank[:n_mem] += drift_step_size * drift
+
+                # decision scores (batched)
+                scores_t = compute_scores_batched(
+                    probe, mu_bank, n_mem, sigma, metric,
+                )
+                if metric == "loglikelihood":
+                    score_val = scores_t.max().item()
+                else:
+                    score_val = scores_t.min().item()
+            else:
+                score_val = None
+
+            # ---------- DECISION STEP ----------
+            if score_val is not None:
+                is_repeat = incoming in seen
+                if is_repeat:
+                    hit_scores.append(score_val)
+                    isi = t - last_seen[incoming]
+                    isi_hit_dists[isi].append((score_val, t))
+                else:
+                    fa_scores.append(score_val)
+                    fa_by_t[t - 1].append(score_val)
+
+            # ---------- STORE NEW MEMORY ----------
+            base = X0[incoming].clone()
+            noise_enc = torch.randn(
+                base.shape, device=base.device, dtype=base.dtype,
+                generator=torch_rng,
+            )
+            mu_bank[n_mem] = base + noise_enc * (sigma0 * dim_std)
+            n_mem += 1
+            seen.add(incoming)
+            last_seen[incoming] = t
+
+    return {
+        "hits": np.array(hit_scores),
+        "fas": np.array(fa_scores),
+        "isi_hit_dists": dict(isi_hit_dists),
+        "fa_by_t": fa_by_t,
+        "T_max": T_max,
+        "stds_over_time": np.empty((0, 2)),
         "metric": metric,
         "score_type": "likelihood" if metric == "loglikelihood" else "distance",
     }
