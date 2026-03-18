@@ -6,7 +6,7 @@ import numpy as np
 import glob
 import sys
 
-sys.path.append('/orcd/data/jhm/001/om2/bjmedina/')
+sys.path.append('/om2/user/bjmedina/')
 
 from chexture_choolbox.auditorytexture.statistics_sets import (
     STAT_SET_FULL_MCDERMOTTSIMONCELLI as statistics_dict

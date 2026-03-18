@@ -10,10 +10,10 @@
 #SBATCH -o yaml_logs/%x_%A_%a.out
 #SBATCH -e yaml_logs/%x_%A_%a.err
 
-source activate /orcd/data/jhm/001/om2/gelbanna/miniconda3/envs/asr312
-cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
+source activate /om2/user/gelbanna/miniconda3/envs/asr312
+cd /om2/user/bjmedina/auditory-memory/memory || exit 1
 
-YAML_DIR=/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/model_yamls/three-regime/resnet50
+YAML_DIR=/om2/user/bjmedina/auditory-memory/memory/model_yamls/three-regime/resnet50
 
 # Load YAML file list into an array (sorted, stable)
 mapfile -t YAMLS < <(ls ${YAML_DIR}/run_*.yaml | sort)
@@ -30,4 +30,4 @@ echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
 echo "YAML_PATH = $YAML_PATH"
 echo "======================================="
 
-python /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/main_v4.py "$YAML_PATH"
+python /om2/user/bjmedina/auditory-memory/memory/src/model/main_v4.py "$YAML_PATH"

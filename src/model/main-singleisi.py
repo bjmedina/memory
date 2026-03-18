@@ -18,10 +18,10 @@ from sklearn.metrics import roc_curve, auc
 from sklearn.linear_model import LinearRegression
 
 # project-specific paths
-sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
 sys.path.append('../utls/')
 sys.path.append('../src/model/')
-sys.path.append("/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/")
+sys.path.append("/om2/user/bjmedina/auditory-memory/memory/")
 
 from chexture_choolbox.auditorytexture.texture_model import TextureModel
 from chexture_choolbox.auditorytexture.helpers import FlattenStats
@@ -518,6 +518,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--save_base", type=str, default="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/figures/model-behavior_v5/")
+    parser.add_argument("--save_base", type=str, default="/om2/user/bjmedina/auditory-memory/memory/figures/model-behavior_v5/")
     args = parser.parse_args()
     main(args)
