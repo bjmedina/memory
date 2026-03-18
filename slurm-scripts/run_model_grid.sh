@@ -6,16 +6,16 @@
 #SBATCH -c 4
 #SBATCH --mem=24G
 #SBATCH --gres=gpu:1
-#SBATCH -o /om2/user/bjmedina/auditory-memory/memory/slurm-scripts/logs/%x_%A_%a.out
-#SBATCH -e /om2/user/bjmedina/auditory-memory/memory/slurm-scripts/logs/%x_%A_%a.err
+#SBATCH -o /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/slurm-scripts/logs/%x_%A_%a.out
+#SBATCH -e /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/slurm-scripts/logs/%x_%A_%a.err
 
 # =============================
 # ENVIRONMENT SETUP
 # =============================
 #fsource ~/.bashrc
-source activate /om2/user/gelbanna/miniconda3/envs/asr312
+source activate /orcd/data/jhm/001/om2/gelbanna/miniconda3/envs/asr312
 
-cd /om2/user/bjmedina/auditory-memory/memory/utls || exit 1
+cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/utls || exit 1
 
 # =============================
 # PARAMETER GRID
@@ -57,11 +57,11 @@ echo "  Rate:       $rate"
 # EXECUTION
 # =============================
 
-python3 /om2/user/bjmedina/auditory-memory/memory/src/model/main.py \
+python3 /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/main.py \
   --metric "$metric" \
   --noise_mode "$noise_mode" \
   --rate "$rate" \
   --run_id "prolific_batch" \
-  --save_base "/om2/user/bjmedina/auditory-memory/memory/figures/model-behavior/"
+  --save_base "/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/figures/model-behavior/"
 
 echo "✅ Done: metric=$metric, noise_mode=$noise_mode, rate=$rate"

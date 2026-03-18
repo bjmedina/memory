@@ -5,7 +5,7 @@ import torch
 sys.path.append('../utils/')
 sys.path.append('../src/model/')
 
-sys.path.append("/om2/user/bjmedina/auditory-memory/memory/")
+sys.path.append("/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/")
 
 from utils.plotting import plot_dprime_by_isi, plot_itemwise_split_half_scatter_df, ensure_dir
 from utils.dprime import recompute_dprime_by_isi_per_subject
@@ -14,7 +14,7 @@ from utils.reliability import compute_itemwise_split_half_reliability
 import MixtureMemoryModel
 import encoders
 
-sys.path.append('/om2/user/bjmedina/')
+sys.path.append('/orcd/data/jhm/001/om2/bjmedina/')
 
 from chexture_choolbox.auditorytexture.statistics_sets import (
     STAT_SET_FULL_MCDERMOTTSIMONCELLI as statistics_dict
@@ -592,12 +592,12 @@ def save_marginals(eval_df: pd.DataFrame, out_dir: str, prefix: str = "marginal"
 #     n_inits=20,
 #     bounds=[(0.0, 1.0), (0.0, 100.0)],
 #     method="Powell",
-#     out_dir="/om2/user/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only/atexts-len120",
+#     out_dir="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only/atexts-len120",
 #     seed=123
 # )
 #
 # # Save marginals for quick inspection later
-# save_marginals(results["eval_df"], out_dir="/om2/user/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only/atexts-len120", n_bins=30)
+# save_marginals(results["eval_df"], out_dir="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only/atexts-len120", n_bins=30)
 #
 # # Best overall:
 # print("BEST:", results["best_overall"])
@@ -671,7 +671,7 @@ print("Number of participants used in analysis:", len(exps))
 
 
 safe_name = which_task.lower().replace(" ", "_")  # e.g., "globalized_music"
-save_dir = os.path.join("/om2/user/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only", safe_name)
+save_dir = os.path.join("/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only", safe_name)
 
 ensure_dir(save_dir)
 print(save_dir)
@@ -684,12 +684,12 @@ results = run_multi_start_minimize(
     n_inits=10,
     bounds=[(0, 1.0), (0, 1.0)],
     method="Powell",
-    out_dir="/om2/user/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only/atexts-len120/mixturemodel_relative",
+    out_dir="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only/atexts-len120/mixturemodel_relative",
     seed=123
 )
 
 # Save marginals for quick inspection later
-save_marginals(results["eval_df"], out_dir="/om2/user/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only/atexts-len120/mixturemodel_relative", n_bins=30)
+save_marginals(results["eval_df"], out_dir="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/figures/human-results/isi-16-only/atexts-len120/mixturemodel_relative", n_bins=30)
 
 # Best overall:
 print("BEST:", results["best_overall"])

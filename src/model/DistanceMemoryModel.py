@@ -7,7 +7,7 @@ from scipy.io import wavfile
 from scipy import signal
 from sklearn.decomposition import PCA
 
-sys.path.append('/om2/user/bjmedina/')
+sys.path.append('/orcd/data/jhm/001/om2/bjmedina/')
 
 from chexture_choolbox.auditorytexture.statistics_sets import (
     STAT_SET_FULL_MCDERMOTTSIMONCELLI as statistics_dict

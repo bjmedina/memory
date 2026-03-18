@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J mem_models
-#SBATCH -o /om2/user/bjmedina/auditory-memory/memory/logs/%x_%j.out
-#SBATCH -e /om2/user/bjmedina/auditory-memory/memory/logs/%x_%j.err
+#SBATCH -o /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/logs/%x_%j.out
+#SBATCH -e /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/logs/%x_%j.err
 #SBATCH -p normal
 #SBATCH -t 24:00:00
 #SBATCH --mem=16G
@@ -19,7 +19,7 @@ source activate your_env_name   # replace with your conda env name
 # ==============================
 # Paths
 # ==============================
-BASE_DIR="/om2/user/bjmedina/auditory-memory/memory"
+BASE_DIR="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory"
 SCRIPT="${BASE_DIR}/src/main.py"
 
 X0_PATH="${BASE_DIR}/data/X0_tensor.pt"

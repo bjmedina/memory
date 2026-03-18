@@ -9,8 +9,8 @@
 #SBATCH -o logs/sigma0_stability_%j.out
 #SBATCH -e logs/sigma0_stability_%j.err
 
-source activate /om2/user/gelbanna/miniconda3/envs/asr312
-cd /om2/user/bjmedina/auditory-memory/memory || exit 1
+source activate /orcd/data/jhm/001/om2/gelbanna/miniconda3/envs/asr312
+cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
 NB_IN=notebooks/2026-02-12_isi0-small-tests-on-model-sigma0-stability.ipynb
 NB_OUT=notebooks/2026-02-12_isi0-small-tests-on-model-sigma0-stability_executed.ipynb

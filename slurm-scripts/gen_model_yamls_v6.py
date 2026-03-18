@@ -15,7 +15,7 @@ import argparse
 
 def base_config(n_samples=50, n_seqs=36):
     return {
-        "results_root": "/om2/user/bjmedina/auditory-memory/memory",
+        "results_root": "/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory",
         "tag": "slurm",
         "experiment": {
             "is_multi": True,
