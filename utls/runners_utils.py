@@ -14,10 +14,10 @@ from pathlib import Path
 
 
 # project-specific paths
-sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
 sys.path.append('../utls/')
 sys.path.append('../src/model/')
-sys.path.append("/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/")
+sys.path.append("/om2/user/bjmedina/auditory-memory/memory/")
 
 from chexture_choolbox.auditorytexture.texture_model import TextureModel
 from chexture_choolbox.auditorytexture.helpers import FlattenStats
@@ -262,8 +262,8 @@ def compute_model_dprime_for_run(run_out, isis):
 
 def build_encoder(cfg):
 
-    sys.path.append(f'/orcd/data/jhm/001/om2/bjmedina/models/cochdnn/model_directories/{cfg['model_name']}_{cfg['task']}/')
-    print("LOADING FROM", f'/orcd/data/jhm/001/om2/bjmedina/models/cochdnn/model_directories/{cfg['model_name']}_{cfg['task']}/')
+    sys.path.append(f'/om2/user/bjmedina/models/cochdnn/model_directories/{cfg['model_name']}_{cfg['task']}/')
+    print("LOADING FROM", f'/om2/user/bjmedina/models/cochdnn/model_directories/{cfg['model_name']}_{cfg['task']}/')
        
     etype = cfg["encoder_type"]
 

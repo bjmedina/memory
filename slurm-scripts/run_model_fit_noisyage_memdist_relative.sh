@@ -13,9 +13,9 @@
 
 
 #fsource ~/.bashrc
-source activate /orcd/data/jhm/001/om2/gelbanna/miniconda3/envs/asr312
+source activate /om2/user/gelbanna/miniconda3/envs/asr312
 
 # Location of the driver
-cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/slurm-scripts
+cd /om2/user/bjmedina/auditory-memory/memory/slurm-scripts
 
 python ../src/model/optimize_noisy_age_memory_dist_model_relative.py

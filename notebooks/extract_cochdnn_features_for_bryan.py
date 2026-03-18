@@ -29,7 +29,7 @@ for architecture in architectures:
                             'layer': layer})
 
 def load_sound_list(sound_set):
-    sound_path = '/orcd/data/jhm/001/om2/bjmedina/BOLIVIA2024/assets/{}/soundlist.csv'
+    sound_path = '/om2/user/bjmedina/BOLIVIA2024/assets/{}/soundlist.csv'
     df = pd.read_csv(sound_path.format(sound_set))
     sound_list = df.stim_path    
     return sound_list
@@ -48,7 +48,7 @@ def main():
     features = ts.features.extract_from_cochdnn(model_name, layer, sound_list)
 
     print('Saving features', flush=True)
-    filename = f'/orcd/data/jhm/001/om2/bjmedina/BOLIVIA2024/assets/{args.sound_set}/{model_name}-{layer}.npy'
+    filename = f'/om2/user/bjmedina/BOLIVIA2024/assets/{args.sound_set}/{model_name}-{layer}.npy'
     numpy_features = features.cpu().numpy()
     np.save(filename, numpy_features)
 

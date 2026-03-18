@@ -16,10 +16,10 @@ from scipy.spatial.distance import pdist
 from tqdm import tqdm_notebook
 from tqdm.notebook import trange, tqdm
 
-sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/')
-sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/utls/')
-sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/')
-sys.path.append("/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/")
+sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/om2/user/bjmedina/auditory-memory/memory/utls/')
+sys.path.append('/om2/user/bjmedina/auditory-memory/memory/src/model/')
+sys.path.append("/om2/user/bjmedina/auditory-memory/memory/")
 
 from chexture_choolbox.auditorytexture.texture_model import TextureModel
 from chexture_choolbox.auditorytexture.helpers import FlattenStats
@@ -202,7 +202,7 @@ tasks = {
     2: "atexts",
 }
 
-model_cfg, model_cfg_path = load_config("/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/model_yamls/three-regime/resnet50/nontime_avg/run_000005.yaml")
+model_cfg, model_cfg_path = load_config("/om2/user/bjmedina/auditory-memory/memory/model_yamls/three-regime/resnet50/nontime_avg/run_000005.yaml")
 
 noise_cfg = model_cfg["noise_model"]
 #print(model_cfg['experiment']['n_seqs'])

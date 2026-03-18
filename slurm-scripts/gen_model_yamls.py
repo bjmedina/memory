@@ -16,7 +16,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 def base_config():
     """Return base config shared by all runs."""
     return {
-        "results_root": "/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/figures/model_results_v2",
+        "results_root": "/om2/user/bjmedina/auditory-memory/memory/figures/model_results_v2",
         "tag": "slurm",
         "experiment": {
             "is_multi": True,

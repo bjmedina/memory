@@ -27,10 +27,10 @@ from pathlib import Path
 from scipy.spatial.distance import pdist
 
 # project-specific paths
-sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/')
-sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/utls/')
-sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/')
-sys.path.append("/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/")
+sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/om2/user/bjmedina/auditory-memory/memory/utls/')
+sys.path.append('/om2/user/bjmedina/auditory-memory/memory/src/model/')
+sys.path.append("/om2/user/bjmedina/auditory-memory/memory/")
 
 from chexture_choolbox.auditorytexture.texture_model import TextureModel
 from chexture_choolbox.auditorytexture.helpers import FlattenStats
