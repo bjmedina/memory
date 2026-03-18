@@ -13,8 +13,8 @@
 
 
 #fsource ~/.bashrc
-source activate /om2/user/gelbanna/miniconda3/envs/asr312
+source activate /orcd/data/jhm/001/om2/gelbanna/miniconda3/envs/asr312
 
-cd /om2/user/bjmedina/auditory-memory/memory/slurm-scripts
+cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/slurm-scripts
 idx=$((SLURM_ARRAY_TASK_ID - 1))
 python ../figures/generate-likelihood-model-graphs.py --param_idx "$idx"

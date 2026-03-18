@@ -93,14 +93,14 @@ class AudioSetMixtures(torch.utils.data.Dataset):
         return len(self.mixture_inds)
 
 def get_dataset(batch_size, num_workers, 
-                stationarity_screen_list='/om2/user/jmhicks/projects/TextureStreaming/stimuli/OVERLAPPED_0.5s_all_4s_sound_list_with_stationarity_score_no_speech_no_music_audioset_matlab_coch_rms0p02.csv', 
+                stationarity_screen_list='/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/stimuli/OVERLAPPED_0.5s_all_4s_sound_list_with_stationarity_score_no_speech_no_music_audioset_matlab_coch_rms0p02.csv', 
                 audioset_path='/om/data/public/audioset/wavs/unbalanced_train_segments_downloads/', 
                 duration=4):
     dataset = AudioSetTextures(stationarity_screen_list, audioset_path, duration)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
 
 def get_mixture_dataset(batch_size, num_workers, 
-                        stationarity_screen_list='/om2/user/jmhicks/projects/TextureStreaming/stimuli/OVERLAPPED_0.5s_all_4s_sound_list_with_stationarity_score_no_speech_no_music_audioset_matlab_coch_rms0p02.csv', 
+                        stationarity_screen_list='/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/stimuli/OVERLAPPED_0.5s_all_4s_sound_list_with_stationarity_score_no_speech_no_music_audioset_matlab_coch_rms0p02.csv', 
                         audioset_path='/om/data/public/audioset/wavs/unbalanced_train_segments_downloads/', 
                         duration=4):
     dataset = AudioSetMixtures(stationarity_screen_list, audioset_path, duration)

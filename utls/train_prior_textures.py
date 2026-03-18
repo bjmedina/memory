@@ -190,7 +190,7 @@ def compare_mixtures_to_textures(score_model, cfg, ckpt, mode):
 
     from eval_statistics import load_test_data
     mix_dataset = load_test_data(
-                data_path='/om2/user/lakshmin/audio-prior/assets/exp23_mixture_statistics_4096texturePCs.pt',
+                data_path='/orcd/data/jhm/001/om2/lakshmin/audio-prior/assets/exp23_mixture_statistics_4096texturePCs.pt',
                 config=cfg, 
                 device=device
             )
