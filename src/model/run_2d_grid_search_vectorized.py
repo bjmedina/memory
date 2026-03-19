@@ -10,13 +10,11 @@ Parallelization modes
   sigma0 (default):  Each job processes one sigma0 index → 8 jobs (default grid), 15 jobs (--fine).
   flat:              Each job processes one (sigma0, sigma, eta) triple → 392 (default) or 2535 (--fine).
 
-Resume / accumulate
--------------------
+Resume
+------
   --resume       Skip triples that already have a per-triple .npz file.
-  --accumulate   Load existing per-triple data, run *additional* MC reps with
-                 non-overlapping seeds, concatenate raw scores, and recompute
-                 ROC / d'.  Seeds continue from where the previous run left
-                 off (``rep_offset = existing_n_mc``).
+                 Missing triples are computed normally. Useful for restarting
+                 after a partial failure without redoing finished work.
 
 Output is written under --save-dir (default: 2d_grid_search_vectorized) so it stays separate from
 the non-vectorized run. Merged file: grid_search_results_vec.npz.
@@ -26,10 +24,7 @@ Usage examples
   # Single slice locally
   python src/model/run_2d_grid_search_vectorized.py --job-index 0 --n-mc 10
 
-  # Add 10 more MC reps to existing results
-  python src/model/run_2d_grid_search_vectorized.py --job-index 0 --n-mc 10 --accumulate
-
-  # Skip already-computed triples
+  # Restart after crash — skip completed triples, run missing ones
   python src/model/run_2d_grid_search_vectorized.py --job-index 0 --n-mc 10 --resume
 
   # Merge all slices after completion
@@ -76,16 +71,8 @@ FINE_ETA    = [0.0, 0.0025, 0.005, 0.0075, 0.01, 0.015, 0.02, 0.035, 0.05, 0.075
 
 def run_mc_dprime(sigma0, sigma, eta, *,
                   X0, name_to_idx, experiment_list, adapter,
-                  isi_values, n_mc, seed, metric, rep_offset=0):
+                  isi_values, n_mc, seed, metric):
     """Run MC sweep using vectorised runner and return d' per ISI.
-
-    Parameters
-    ----------
-    rep_offset : int
-        Starting rep index for seed generation.  Seeds are
-        ``seed * 10_000 + rep_offset + rep`` for rep in 0..n_mc-1.
-        Use this when accumulating additional MC reps so that new
-        seeds don't overlap with previous runs.
 
     Returns
     -------
@@ -109,7 +96,7 @@ def run_mc_dprime(sigma0, sigma, eta, *,
             score_model=adapter,
             drift_step_size=eta,
             metric=metric,
-            seed=seed * 10_000 + rep_offset + rep,
+            seed=seed * 10_000 + rep,
         )
         for risi in runner_isi_values:
             all_isi_hits[risi].extend(run['isi_hit_dists'].get(risi, []))
@@ -122,7 +109,7 @@ def run_mc_dprime(sigma0, sigma, eta, *,
         'sigma0': sigma0,
         'sigma': sigma,
         'eta': eta,
-        'n_mc': rep_offset + n_mc,      # total MC reps (existing + new)
+        'n_mc': n_mc,
         'seed': seed,
         'metric': metric,
         'isi_values': np.array(list(isi_values)),
@@ -171,81 +158,6 @@ def run_mc_dprime(sigma0, sigma, eta, *,
         triple_data[f'hit_std_isi{exp_isi}'] = float(np.std(hits_scores))
 
     return dprime_dict, triple_data
-
-
-def _accumulate_triple(existing_path, new_triple_data, isi_values):
-    """Merge new MC results with existing per-triple data.
-
-    Concatenates raw hit/FA scores from both runs, then recomputes
-    ROC curves and d' from the combined data.
-    """
-    old = np.load(existing_path, allow_pickle=True)
-    score_type = 'distance'
-
-    # Merge FA scores
-    old_fas = old['fa_scores'] if 'fa_scores' in old else np.array([], dtype=float)
-    new_fas = new_triple_data['fa_scores']
-    merged_fas = np.concatenate([old_fas, new_fas])
-
-    total_n_mc = new_triple_data['n_mc']  # already includes rep_offset + n_mc
-
-    merged = {
-        'sigma0': new_triple_data['sigma0'],
-        'sigma': new_triple_data['sigma'],
-        'eta': new_triple_data['eta'],
-        'n_mc': total_n_mc,
-        'seed': new_triple_data['seed'],
-        'metric': new_triple_data['metric'],
-        'isi_values': new_triple_data['isi_values'],
-        'fa_scores': merged_fas,
-        'fa_mean': float(np.mean(merged_fas)) if len(merged_fas) > 0 else np.nan,
-        'fa_std': float(np.std(merged_fas)) if len(merged_fas) > 0 else np.nan,
-        'n_fas': len(merged_fas),
-    }
-
-    dprime_dict = {}
-
-    for isi in isi_values:
-        old_hits = old[f'hit_scores_isi{isi}'] if f'hit_scores_isi{isi}' in old else np.array([], dtype=float)
-        new_hits = new_triple_data.get(f'hit_scores_isi{isi}', np.array([], dtype=float))
-        old_times = old[f'hit_timestamps_isi{isi}'] if f'hit_timestamps_isi{isi}' in old else np.array([], dtype=int)
-        new_times = new_triple_data.get(f'hit_timestamps_isi{isi}', np.array([], dtype=int))
-
-        hits_scores = np.concatenate([old_hits, new_hits])
-        hits_times = np.concatenate([old_times, new_times])
-        n_hits = len(hits_scores)
-
-        if n_hits < 3:
-            dprime_dict[isi] = np.nan
-            merged[f'hit_scores_isi{isi}'] = np.array([], dtype=float)
-            merged[f'hit_timestamps_isi{isi}'] = np.array([], dtype=int)
-            merged[f'roc_fpr_isi{isi}'] = np.array([], dtype=float)
-            merged[f'roc_tpr_isi{isi}'] = np.array([], dtype=float)
-            for key in ['dprime', 'auc', 'dprime_sem', 'n_hits', 'hit_mean', 'hit_std']:
-                merged[f'{key}_isi{isi}'] = np.nan
-            continue
-
-        roc = roc_from_arrays(hits_scores, merged_fas, score_type=score_type)
-        if roc is not None:
-            fpr, tpr, auc_val = roc
-            dp = auroc_to_dprime(auc_val)
-        else:
-            fpr, tpr = np.array([]), np.array([])
-            auc_val, dp = np.nan, np.nan
-
-        dprime_dict[isi] = dp
-        merged[f'hit_scores_isi{isi}'] = hits_scores
-        merged[f'hit_timestamps_isi{isi}'] = hits_times
-        merged[f'roc_fpr_isi{isi}'] = fpr
-        merged[f'roc_tpr_isi{isi}'] = tpr
-        merged[f'auc_isi{isi}'] = float(auc_val)
-        merged[f'dprime_isi{isi}'] = float(dp)
-        merged[f'dprime_sem_isi{isi}'] = 0.0
-        merged[f'n_hits_isi{isi}'] = n_hits
-        merged[f'hit_mean_isi{isi}'] = float(np.mean(hits_scores))
-        merged[f'hit_std_isi{isi}'] = float(np.std(hits_scores))
-
-    return dprime_dict, merged
 
 
 # ── merge mode ────────────────────────────────────────────────────────
@@ -333,12 +245,10 @@ def parse_args():
     p.add_argument('--merge', action='store_true',
                    help='Merge per-slice .npz files instead of running')
 
-    # Resume / accumulate
+    # Resume
     p.add_argument('--resume', action='store_true',
-                   help='Skip triples that already have per-triple .npz files')
-    p.add_argument('--accumulate', action='store_true',
-                   help='Load existing per-triple data and add more MC reps '
-                        '(seeds continue from previous n_mc)')
+                   help='Skip triples that already have per-triple .npz files; '
+                        'missing triples are computed normally')
 
     # Job control
     p.add_argument('--job-index', type=int, default=0,
@@ -470,8 +380,6 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
           f'{n_configs} configs ===')
     if args.resume:
         print('  --resume: will skip triples with existing per-triple files')
-    if args.accumulate:
-        print('  --accumulate: will add MC reps to existing per-triple data')
 
     # Per-triple output directory
     per_triple_dir = os.path.join(args.save_dir, 'per_triple')
@@ -482,7 +390,6 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
 
     count = 0
     skipped = 0
-    accumulated = 0
     t_start = time.perf_counter()
 
     for i_sig, sig in enumerate(sigma_grid):
@@ -501,20 +408,7 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
                 count += 1
                 continue
 
-            # --accumulate: check for existing data to merge with
-            rep_offset = 0
-            if args.accumulate and os.path.exists(triple_path):
-                existing = np.load(triple_path, allow_pickle=True)
-                rep_offset = int(existing['n_mc'])
-
-            dp, triple_data = run_mc_dprime(
-                s0, sig, eta, **common_kwargs, rep_offset=rep_offset)
-
-            # If accumulating, merge old + new
-            if rep_offset > 0:
-                dp, triple_data = _accumulate_triple(
-                    triple_path, triple_data, isi_values)
-                accumulated += 1
+            dp, triple_data = run_mc_dprime(s0, sig, eta, **common_kwargs)
 
             for isi in isi_values:
                 results[isi][i_sig, i_eta] = dp.get(isi, np.nan)
@@ -533,8 +427,6 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
     print(f'Slice complete: {count} configs in {t_total:.1f}s')
     if skipped:
         print(f'  Skipped (resume): {skipped}')
-    if accumulated:
-        print(f'  Accumulated: {accumulated}')
 
     out_path = os.path.join(args.save_dir, f'grid_slice_s0idx{i_s0}.npz')
     np.savez(out_path,
@@ -546,7 +438,7 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
              parallel_mode='sigma0',
              **{f'dprime_isi{isi}': results[isi] for isi in isi_values})
     print(f'Saved to {out_path}')
-    print(f'Per-triple data saved to {per_triple_dir}/ ({count - skipped} new/updated files)')
+    print(f'Per-triple data saved to {per_triple_dir}/ ({count - skipped} new files)')
 
 
 def _run_flat_point(args, sigma0_grid, sigma_grid, eta_grid,
@@ -573,32 +465,17 @@ def _run_flat_point(args, sigma0_grid, sigma_grid, eta_grid,
     if args.resume and os.path.exists(triple_path):
         print(f'Skipping (--resume): {triple_path} already exists')
         existing = np.load(triple_path, allow_pickle=True)
-        dp = {}
         for isi in isi_values:
             k = f'dprime_isi{isi}'
-            dp[isi] = float(existing[k]) if k in existing else np.nan
-            print(f"  ISI={isi}: d'={dp[isi]:.4f}")
+            val = float(existing[k]) if k in existing else np.nan
+            print(f"  ISI={isi}: d'={val:.4f}")
         return
 
-    # --accumulate: check for existing data
-    rep_offset = 0
-    if args.accumulate and os.path.exists(triple_path):
-        existing = np.load(triple_path, allow_pickle=True)
-        rep_offset = int(existing['n_mc'])
-        print(f'  Accumulating: {rep_offset} existing + {args.n_mc} new MC reps')
-
     t_start = time.perf_counter()
-    dp, triple_data = run_mc_dprime(
-        s0, sig, eta, **common_kwargs, rep_offset=rep_offset)
-
-    # If accumulating, merge old + new
-    if rep_offset > 0:
-        dp, triple_data = _accumulate_triple(
-            triple_path, triple_data, isi_values)
-
+    dp, triple_data = run_mc_dprime(s0, sig, eta, **common_kwargs)
     t_total = time.perf_counter() - t_start
 
-    print(f'Done in {t_total:.2f}s (total n_mc={triple_data["n_mc"]})')
+    print(f'Done in {t_total:.2f}s')
     for isi in isi_values:
         print(f"  ISI={isi}: d'={dp.get(isi, np.nan):.4f}")
 
