@@ -1,12 +1,14 @@
 #!/bin/bash
 #SBATCH -J 2d_grid_search_vec
 #SBATCH -p mit_normal_gpu
-#SBATCH -t 0-2:00:00
+#SBATCH -t 0-0:30:00
 #SBATCH -n 1
 #SBATCH -c 1
-#SBATCH --mem=8G
-## Default: 8 jobs (one per sigma0). For fine grid use: sbatch --array=0-14 ... and set FINE_GRID=true
-#SBATCH --array=0-14
+#SBATCH --mem=4G
+## Flat mode: one job per (sigma0, sigma, eta) triple.
+## Fine grid: 15 x 13 x 13 = 2535 triples → array 0-2534.
+## %500 throttle limits concurrent jobs to avoid overwhelming the scheduler.
+#SBATCH --array=0-2534%500
 #SBATCH -o slurm-scripts/logs/%x_%A_%a.out
 #SBATCH -e slurm-scripts/logs/%x_%A_%a.err
 
@@ -24,12 +26,12 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 # Output goes to 2d_grid_search_vectorized by default (separate from non-vectorized).
 #
 # Examples:
+#   sbatch slurm-scripts/run_2d_grid_search_vectorized.sh          # fine grid, flat mode, 2535 jobs
 #   N_MC=50 ISIS="0 2 16" sbatch slurm-scripts/run_2d_grid_search_vectorized.sh
-#   PARALLEL_MODE=flat sbatch --array=0-391 slurm-scripts/run_2d_grid_search_vectorized.sh
 #   N_MC=100 METRIC=cosine SEED=123 sbatch slurm-scripts/run_2d_grid_search_vectorized.sh
 #
-# Fine-grained grid (15×13×13 = 2535 triples, 15 sigma0 slices):
-#   FINE_GRID=true sbatch --array=0-14 slurm-scripts/run_2d_grid_search_vectorized.sh
+# sigma0 mode (fewer, longer jobs — one per sigma0 slice):
+#   PARALLEL_MODE=sigma0 sbatch --array=0-14 slurm-scripts/run_2d_grid_search_vectorized.sh
 #
 # Local test (one task, same as SLURM would run for job 0):
 #   cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory
@@ -39,7 +41,7 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
 N_MC=${N_MC:-10}
 ISIS="${ISIS:-0 2 8 16}"
-PARALLEL_MODE="${PARALLEL_MODE:-sigma0}"
+PARALLEL_MODE="${PARALLEL_MODE:-flat}"
 FINE_GRID="${FINE_GRID:-true}"
 # Distinct from non-vectorized (2d_grid_search_full / 2d_grid_search)
 SAVE_DIR="${SAVE_DIR:-reports/figures/2d_grid_search_vectorized_full}"
