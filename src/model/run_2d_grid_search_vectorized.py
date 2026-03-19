@@ -63,7 +63,16 @@ FINE_ETA    = [0.0, 0.0025, 0.005, 0.0075, 0.01, 0.015, 0.02, 0.035, 0.05, 0.075
 def run_mc_dprime(sigma0, sigma, eta, *,
                   X0, name_to_idx, experiment_list, adapter,
                   isi_values, n_mc, seed, metric):
-    """Run MC sweep using vectorised runner and return d' per ISI."""
+    """Run MC sweep using vectorised runner and return d' per ISI.
+
+    Returns
+    -------
+    dprime_dict : dict
+        {isi: d'} for backward compatibility.
+    triple_data : dict
+        Comprehensive per-triple data including raw scores, ROC curves,
+        and summary statistics (suitable for saving as .npz).
+    """
     runner_isi_values = [isi + 1 for isi in isi_values]
     score_type = 'distance'
 
@@ -84,23 +93,62 @@ def run_mc_dprime(sigma0, sigma, eta, *,
             all_isi_hits[risi].extend(run['isi_hit_dists'].get(risi, []))
         all_fas.extend(run['fas'])
 
-    all_fas = np.array(all_fas, dtype=float)
-    result = {}
+    fas_arr = np.array(all_fas, dtype=float)
+
+    dprime_dict = {}
+    triple_data = {
+        'sigma0': sigma0,
+        'sigma': sigma,
+        'eta': eta,
+        'n_mc': n_mc,
+        'seed': seed,
+        'metric': metric,
+        'isi_values': np.array(list(isi_values)),
+        'fa_scores': fas_arr,
+        'fa_mean': float(np.mean(fas_arr)) if len(fas_arr) > 0 else np.nan,
+        'fa_std': float(np.std(fas_arr)) if len(fas_arr) > 0 else np.nan,
+        'n_fas': len(fas_arr),
+    }
 
     for exp_isi, risi in zip(isi_values, runner_isi_values):
         hits_raw = all_isi_hits.get(risi, [])
-        if len(hits_raw) < 3:
-            result[exp_isi] = np.nan
-            continue
-        hits = np.array([s for s, t in hits_raw], dtype=float)
-        roc = roc_from_arrays(hits, all_fas, score_type=score_type)
-        if roc is None:
-            result[exp_isi] = np.nan
-        else:
-            _, _, auc_val = roc
-            result[exp_isi] = auroc_to_dprime(auc_val)
+        n_hits = len(hits_raw)
 
-    return result
+        if n_hits < 3:
+            dprime_dict[exp_isi] = np.nan
+            triple_data[f'hit_scores_isi{exp_isi}'] = np.array([], dtype=float)
+            triple_data[f'hit_timestamps_isi{exp_isi}'] = np.array([], dtype=int)
+            triple_data[f'roc_fpr_isi{exp_isi}'] = np.array([], dtype=float)
+            triple_data[f'roc_tpr_isi{exp_isi}'] = np.array([], dtype=float)
+            for key in ['dprime', 'auc', 'dprime_sem', 'n_hits', 'hit_mean', 'hit_std']:
+                triple_data[f'{key}_isi{exp_isi}'] = np.nan
+            continue
+
+        hits_scores = np.array([s for s, t in hits_raw], dtype=float)
+        hits_times = np.array([t for s, t in hits_raw], dtype=int)
+
+        roc = roc_from_arrays(hits_scores, fas_arr, score_type=score_type)
+        if roc is not None:
+            fpr, tpr, auc_val = roc
+            dp = auroc_to_dprime(auc_val)
+        else:
+            fpr, tpr = np.array([]), np.array([])
+            auc_val, dp = np.nan, np.nan
+
+        dprime_dict[exp_isi] = dp
+
+        triple_data[f'hit_scores_isi{exp_isi}'] = hits_scores
+        triple_data[f'hit_timestamps_isi{exp_isi}'] = hits_times
+        triple_data[f'roc_fpr_isi{exp_isi}'] = fpr
+        triple_data[f'roc_tpr_isi{exp_isi}'] = tpr
+        triple_data[f'auc_isi{exp_isi}'] = float(auc_val)
+        triple_data[f'dprime_isi{exp_isi}'] = float(dp)
+        triple_data[f'dprime_sem_isi{exp_isi}'] = 0.0
+        triple_data[f'n_hits_isi{exp_isi}'] = n_hits
+        triple_data[f'hit_mean_isi{exp_isi}'] = float(np.mean(hits_scores))
+        triple_data[f'hit_std_isi{exp_isi}'] = float(np.std(hits_scores))
+
+    return dprime_dict, triple_data
 
 
 # ── merge mode ────────────────────────────────────────────────────────
@@ -303,6 +351,10 @@ def main():
                         isi_values, common_kwargs)
 
 
+def _triple_filename(s0, sig, eta):
+    return f's0={s0:.3f}_sig={sig:.3f}_eta={eta:.3f}.npz'
+
+
 def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
                       isi_values, common_kwargs):
     """Process all (sigma, eta) combos for one sigma0 index."""
@@ -313,6 +365,10 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
     print(f'=== sigma0 slice: idx={i_s0}, sigma0={s0:.4f}, '
           f'{n_configs} configs ===')
 
+    # Per-triple output directory
+    per_triple_dir = os.path.join(args.save_dir, 'per_triple')
+    os.makedirs(per_triple_dir, exist_ok=True)
+
     results = {isi: np.full((len(sigma_grid), len(eta_grid)), np.nan)
                for isi in isi_values}
 
@@ -321,9 +377,15 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
 
     for i_sig, sig in enumerate(sigma_grid):
         for i_eta, eta in enumerate(eta_grid):
-            dp = run_mc_dprime(s0, sig, eta, **common_kwargs)
+            dp, triple_data = run_mc_dprime(s0, sig, eta, **common_kwargs)
             for isi in isi_values:
                 results[isi][i_sig, i_eta] = dp.get(isi, np.nan)
+
+            # Save per-triple raw data
+            triple_path = os.path.join(per_triple_dir,
+                                       _triple_filename(s0, sig, eta))
+            np.savez(triple_path, **triple_data)
+
             count += 1
             if count % 10 == 0 or count == n_configs:
                 elapsed = time.perf_counter() - t_start
@@ -345,6 +407,7 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
              parallel_mode='sigma0',
              **{f'dprime_isi{isi}': results[isi] for isi in isi_values})
     print(f'Saved to {out_path}')
+    print(f'Per-triple data saved to {per_triple_dir}/ ({count} files)')
 
 
 def _run_flat_point(args, sigma0_grid, sigma_grid, eta_grid,
@@ -360,13 +423,23 @@ def _run_flat_point(args, sigma0_grid, sigma_grid, eta_grid,
     print(f'=== flat point: idx={args.job_index}, '
           f'sigma0={s0:.4f}, sigma={sig:.4f}, eta={eta:.4f} ===')
 
+    # Per-triple output directory
+    per_triple_dir = os.path.join(args.save_dir, 'per_triple')
+    os.makedirs(per_triple_dir, exist_ok=True)
+
     t_start = time.perf_counter()
-    dp = run_mc_dprime(s0, sig, eta, **common_kwargs)
+    dp, triple_data = run_mc_dprime(s0, sig, eta, **common_kwargs)
     t_total = time.perf_counter() - t_start
 
     print(f'Done in {t_total:.2f}s')
     for isi in isi_values:
         print(f"  ISI={isi}: d'={dp.get(isi, np.nan):.4f}")
+
+    # Save per-triple raw data
+    triple_path = os.path.join(per_triple_dir,
+                               _triple_filename(s0, sig, eta))
+    np.savez(triple_path, **triple_data)
+    print(f'Per-triple data saved to {triple_path}')
 
     out_path = os.path.join(args.save_dir, f'grid_point_{args.job_index}.npz')
     np.savez(out_path,
