@@ -13,7 +13,7 @@
 # =============================
 # ENVIRONMENT SETUP
 # =============================
-source activate /orcd/data/jhm/001/gelbanna/miniconda3/envs/asr_312
+conda activate /orcd/data/jhm/001/gelbanna/miniconda3/envs/asr_312
 cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
 # =============================
