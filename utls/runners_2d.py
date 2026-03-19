@@ -310,6 +310,158 @@ def run_model_core_2d_vec(
     }
 
 
+# ── vectorised 3-step noise runner (no drift) ────────────────────────
+
+def run_model_core_2d_vec_3step(
+    sigma0,
+    sigma1,
+    sigma2,
+    *,
+    X0,
+    name_to_idx,
+    experiment_list,
+    t_step=5,
+    metric="cosine",
+    debug=False,
+    torch_rng=None,
+    seed=0,
+):
+    """Vectorised 2D memory simulation with 3-step noise schedule (no drift).
+
+    Implements the 'noisy perceptual traces' hypothesis: recognition
+    memory depends on the fidelity of noisy traces with an age-dependent
+    noise schedule.  No prior-driven drift is applied.
+
+    Noise schedule (per memory, per trial):
+      - age <= 1  : minimal noise (1e-5)
+      - 1 < age < t_step : sigma1
+      - age >= t_step     : sigma2
+
+    Encoding noise sigma0 is applied once at memory insertion.
+
+    Parameters
+    ----------
+    sigma0 : float
+        Encoding noise magnitude (applied once at insertion).
+    sigma1 : float
+        Diffusive noise for recent memories (age < t_step).
+    sigma2 : float
+        Diffusive noise for older memories (age >= t_step).
+    X0 : Tensor [N, 2]
+        Stimulus embeddings.
+    name_to_idx : dict
+        Stimulus name -> row index in X0.
+    experiment_list : list[list[str]]
+        Sequences of stimulus names.
+    t_step : int
+        Age threshold for switching from sigma1 to sigma2.
+    metric : str
+        Distance metric for decision.
+    seed : int
+        Random seed.
+
+    Returns
+    -------
+    dict
+        Keys: hits, fas, isi_hit_dists, fa_by_t, T_max, stds_over_time,
+        metric, score_type.
+    """
+    if torch_rng is None:
+        torch_rng = torch.Generator(device=X0.device)
+        torch_rng.manual_seed(seed)
+
+    D = X0.shape[1]
+
+    dim_std = X0.std(0, unbiased=True)
+    rms_std = torch.sqrt(torch.mean(dim_std ** 2)).item()
+    scaled_std = dim_std / rms_std                              # [D]
+
+    hit_scores, fa_scores = [], []
+    isi_hit_dists = defaultdict(list)
+    T_max = max((len(seq) for seq in experiment_list), default=0)
+    fa_by_t = [[] for _ in range(T_max)]
+
+    # Pre-compute sigma tensors for torch.where
+    s1_tensor = torch.tensor(sigma1, device=X0.device, dtype=X0.dtype)
+    s2_tensor = torch.tensor(sigma2, device=X0.device, dtype=X0.dtype)
+    s_min = torch.tensor(1e-5, device=X0.device, dtype=X0.dtype)
+
+    for seq in experiment_list:
+        if not seq:
+            continue
+
+        seq_idx = [name_to_idx[f] for f in seq]
+        seq_len = len(seq_idx)
+
+        # Pre-allocated memory bank and insertion times
+        mu_bank = torch.zeros(seq_len, D, device=X0.device, dtype=X0.dtype)
+        insertion_time = torch.zeros(seq_len, device=X0.device, dtype=torch.long)
+        n_mem = 0
+        seen, last_seen = set(), {}
+
+        for t, incoming in enumerate(seq_idx, start=1):
+            probe = X0[incoming].view(1, -1)                    # [1, D]
+
+            # ---------- UPDATE + SCORE MEMORIES ----------
+            if n_mem > 0:
+                # Age-dependent noise (batched)
+                ages = t - insertion_time[:n_mem]                # [n_mem]
+                sigma_vec = torch.where(ages < t_step, s1_tensor, s2_tensor)
+                sigma_vec = torch.where(ages <= 1, s_min, sigma_vec)
+
+                noise = torch.randn(
+                    n_mem, D,
+                    device=X0.device, dtype=X0.dtype,
+                    generator=torch_rng,
+                )
+                mu_bank[:n_mem] += noise * (sigma_vec[:, None] * scaled_std[None, :])
+
+                # Decision scores (batched) — no drift
+                scores_t = compute_scores_batched(
+                    probe, mu_bank, n_mem, sigma1, metric,
+                )
+                if metric == "loglikelihood":
+                    score_val = scores_t.max().item()
+                else:
+                    score_val = scores_t.min().item()
+            else:
+                score_val = None
+
+            # ---------- DECISION STEP ----------
+            if score_val is not None:
+                is_repeat = incoming in seen
+                if is_repeat:
+                    hit_scores.append(score_val)
+                    isi = t - last_seen[incoming]
+                    isi_hit_dists[isi].append((score_val, t))
+                else:
+                    fa_scores.append(score_val)
+                    fa_by_t[t - 1].append(score_val)
+
+            # ---------- STORE NEW MEMORY ----------
+            base = X0[incoming].clone()
+            noise_enc = torch.randn(
+                base.shape, device=base.device, dtype=base.dtype,
+                generator=torch_rng,
+            )
+            mu_bank[n_mem] = base + noise_enc * (sigma0 * dim_std)
+            insertion_time[n_mem] = t
+            n_mem += 1
+            seen.add(incoming)
+            last_seen[incoming] = t
+
+    return {
+        "hits": np.array(hit_scores),
+        "fas": np.array(fa_scores),
+        "isi_hit_dists": dict(isi_hit_dists),
+        "fa_by_t": fa_by_t,
+        "T_max": T_max,
+        "stds_over_time": np.empty((0, 2)),
+        "metric": metric,
+        "score_type": "likelihood" if metric == "loglikelihood" else "distance",
+    }
+
+
 # ── high-level ISI sweep ─────────────────────────────────────────────
 
 def run_2d_isi_sweep(
