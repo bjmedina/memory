@@ -2,10 +2,11 @@
 """
 3-step noise regime grid search — standalone script for SLURM parallelization.
 
-Sweeps (sigma0, sigma1, sigma2) grid and computes d' per ISI using the
-vectorised runner ``run_model_core_2d_vec_3step``.  This implements the
-'noisy perceptual traces' hypothesis: purely diffusive noise with a
-3-step age-dependent schedule (no prior-driven drift).
+Sweeps (sigma0, sigma1, sigma2) grid and computes d' per ISI using
+``run_model_core`` with a ``ThreeRegimeNoise`` schedule and real stimulus
+representations (ResNet50 layer4).  This implements the 'noisy perceptual
+traces' hypothesis: purely diffusive noise with a 3-step age-dependent
+schedule (no prior-driven drift).
 
 Parallelization modes
 ---------------------
@@ -42,9 +43,21 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..'))
 sys.path.insert(0, _REPO_ROOT)
 
+# cluster paths (needed for encoder pipeline)
+sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/om2/user/bjmedina/auditory-memory/memory/utls/')
+sys.path.append('/om2/user/bjmedina/auditory-memory/memory/src/model/')
+sys.path.append('/om2/user/bjmedina/auditory-memory/memory/')
+
 import torch
-from utls.sandbox_2d_data import make_2d_grid_stimuli
-from utls.runners_2d import run_model_core_2d_vec_3step
+
+from chexture_choolbox.auditorytexture.texture_model import TextureModel
+from chexture_choolbox.auditorytexture.helpers import FlattenStats
+from texture_prior.params import model_params, statistics_set
+
+from utls.encoders import *
+from utls.runners_v2 import run_model_core, make_noise_schedule
+from utls.runners_utils import load_experiment_data, build_encoder, encode_stimuli
 from utls.toy_experiments import make_high_diversity_sequences
 from utls.roc_utils import roc_from_arrays
 from utls.analysis_helpers import auroc_to_dprime
@@ -67,7 +80,7 @@ FINE_SIGMA2 = [0.0, 0.0125, 0.025, 0.0375, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175,
 def run_mc_dprime(sigma0, sigma1, sigma2, *,
                   X0, name_to_idx, experiment_list,
                   t_step, isi_values, n_mc, seed, metric):
-    """Run MC sweep using 3-step vectorised runner and return d' per ISI.
+    """Run MC sweep using run_model_core + ThreeRegimeNoise and return d' per ISI.
 
     Returns
     -------
@@ -78,17 +91,24 @@ def run_mc_dprime(sigma0, sigma1, sigma2, *,
         and summary statistics (suitable for saving as .npz).
     """
     runner_isi_values = [isi + 1 for isi in isi_values]
-    score_type = 'distance'
+    score_type = 'distance' if metric != 'loglikelihood' else 'likelihood'
+
+    noise_schedule = make_noise_schedule('three-regime', {
+        'sigma0': sigma0,
+        'sigma1': sigma1,
+        'sigma2': sigma2,
+        't_step': t_step,
+    })
 
     all_isi_hits = defaultdict(list)
     all_fas = []
 
     for rep in range(n_mc):
-        run = run_model_core_2d_vec_3step(
-            sigma0=sigma0, sigma1=sigma1, sigma2=sigma2,
+        run = run_model_core(
+            sigma0=sigma0,
             X0=X0, name_to_idx=name_to_idx,
             experiment_list=experiment_list,
-            t_step=t_step,
+            noise_schedule=noise_schedule,
             metric=metric,
             seed=seed * 10_000 + rep,
         )
@@ -277,8 +297,26 @@ def parse_args():
                    help='Minimum repeat pairs per ISI per sequence')
     p.add_argument('--seed', type=int, default=42,
                    help='Base random seed')
-    p.add_argument('--metric', type=str, default='euclidean',
+    p.add_argument('--metric', type=str, default='cosine',
                    help='Distance metric')
+
+    # Experiment data
+    p.add_argument('--which-task', type=int, default=0,
+                   help='Task index (0=env-sounds, 1=glob-music, 2=atexts)')
+    p.add_argument('--is-multi', action='store_true', default=True,
+                   help='Use multi-ISI experiment data')
+    p.add_argument('--which-isi', type=int, default=None,
+                   help='Which ISI (only if not multi)')
+
+    # Encoder
+    p.add_argument('--encoder-type', type=str, default='resnet50',
+                   help='Encoder type')
+    p.add_argument('--layer', type=str, default='layer4',
+                   help='Encoder layer (for resnet50/kell2018)')
+    p.add_argument('--time-avg', action='store_true', default=False,
+                   help='Time-average encoder output')
+    p.add_argument('--device', type=str, default='cuda',
+                   help='Device for encoder')
 
     # Output
     p.add_argument('--save-dir', type=str,
@@ -322,9 +360,31 @@ def main():
         print(f'ERROR: job-index {args.job_index} >= total jobs {total_jobs}')
         sys.exit(1)
 
-    # ── setup (shared) — no GMM / score adapter needed ────────────────
-    print(f'Setting up stimuli and sequences ...')
-    X0, name_to_idx, stimulus_pool = make_2d_grid_stimuli()
+    # ── setup: load real stimuli + encoder ──────────────────────────────
+    print(f'Loading experiment data (task={args.which_task}, multi={args.is_multi}) ...')
+    exp_list, all_files, name_to_idx, human_runs, task_name, hr_task_name = \
+        load_experiment_data(args.which_task, args.which_isi, args.is_multi)
+
+    encoder_cfg = dict(
+        encoder_type=args.encoder_type,
+        model_name=args.encoder_type,
+        task='word_speaker_audioset',
+        statistics_dict=statistics_set.statistics,
+        model_params=model_params,
+        sr=20000,
+        duration=2.0,
+        rms_level=0.05,
+        time_avg=args.time_avg,
+        device=args.device,
+        layer=args.layer,
+    )
+    print(f'Building encoder: {args.encoder_type} / {args.layer} ...')
+    encoder = build_encoder(encoder_cfg)
+    print(f'Encoding {len(all_files)} stimuli ...')
+    X0 = encode_stimuli(encoder, all_files)
+    print(f'X0 shape: {X0.shape}')
+
+    stimulus_pool = sorted({s for seq in exp_list for s in seq})
 
     experiment_list, isi_keys = make_high_diversity_sequences(
         stimulus_pool=stimulus_pool,

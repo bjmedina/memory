@@ -4,7 +4,8 @@
 #SBATCH -t 0-0:30:00
 #SBATCH -n 1
 #SBATCH -c 1
-#SBATCH --mem=4G
+#SBATCH --mem=16G
+#SBATCH --gres=gpu:1
 ## Flat mode: one job per (sigma0, sigma1, sigma2) triple.
 ## Fine grid: 15 x 13 x 13 = 2535 triples → array 0-2534.
 ## %500 throttle limits concurrent jobs.
@@ -41,7 +42,11 @@ PARALLEL_MODE="${PARALLEL_MODE:-flat}"
 FINE_GRID="${FINE_GRID:-true}"
 SAVE_DIR="${SAVE_DIR:-reports/figures/3step_grid_search}"
 SEED="${SEED:-43}"
-METRIC="${METRIC:-euclidean}"
+METRIC="${METRIC:-cosine}"
+WHICH_TASK="${WHICH_TASK:-0}"
+ENCODER="${ENCODER:-resnet50}"
+LAYER="${LAYER:-layer4}"
+DEVICE="${DEVICE:-cuda}"
 T_STEP="${T_STEP:-5}"
 N_SEQUENCES="${N_SEQUENCES:-100}"
 SEQ_LENGTH="${SEQ_LENGTH:-99}"
@@ -59,6 +64,9 @@ echo "ISIS               = $ISIS"
 echo "PARALLEL_MODE      = $PARALLEL_MODE"
 echo "FINE_GRID          = $FINE_GRID"
 echo "METRIC             = $METRIC"
+echo "WHICH_TASK         = $WHICH_TASK"
+echo "ENCODER            = $ENCODER"
+echo "LAYER              = $LAYER"
 echo "SEED               = $SEED"
 echo "T_STEP             = $T_STEP"
 echo "SAVE_DIR           = $SAVE_DIR"
@@ -92,6 +100,11 @@ python src/model/run_3step_grid_search.py \
     --n-sequences "$N_SEQUENCES" \
     --seq-length "$SEQ_LENGTH" \
     --min-pairs-per-isi "$MIN_PAIRS" \
+    --which-task "$WHICH_TASK" \
+    --is-multi \
+    --encoder-type "$ENCODER" \
+    --layer "$LAYER" \
+    --device "$DEVICE" \
     --save-dir "$SAVE_DIR" \
     --resume
 
