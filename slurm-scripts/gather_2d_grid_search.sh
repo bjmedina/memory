@@ -12,7 +12,7 @@
 #   bash slurm-scripts/gather_2d_grid_search.sh
 # ──────────────────────────────────────────────────────────────────────
 #SBATCH -J isi_gather
-#SBATCH -p mcdermott
+#SBATCH -p mit_preemptable
 #SBATCH -t 0-0:10:00
 #SBATCH -n 1
 #SBATCH -c 1
@@ -20,8 +20,8 @@
 #SBATCH -o logs/isi_gather_%j.out
 #SBATCH -e logs/isi_gather_%j.err
 
-source activate /om2/user/gelbanna/miniconda3/envs/asr312
-cd /om2/user/bjmedina/auditory-memory/memory || exit 1
+source activate /orcd/data/jhm/001/gelbanna/miniconda3/envs/asr_312
+cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
 OUTPUT_DIR="${OUTPUT_DIR:-reports/figures/2d_grid_search/slurm_$(date +'%Y%m%d')}"
 
