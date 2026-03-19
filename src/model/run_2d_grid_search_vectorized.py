@@ -10,6 +10,12 @@ Parallelization modes
   sigma0 (default):  Each job processes one sigma0 index → 8 jobs (default grid), 15 jobs (--fine).
   flat:              Each job processes one (sigma0, sigma, eta) triple → 392 (default) or 2535 (--fine).
 
+Resume
+------
+  --resume       Skip triples that already have a per-triple .npz file.
+                 Missing triples are computed normally. Useful for restarting
+                 after a partial failure without redoing finished work.
+
 Output is written under --save-dir (default: 2d_grid_search_vectorized) so it stays separate from
 the non-vectorized run. Merged file: grid_search_results_vec.npz.
 
@@ -17,6 +23,9 @@ Usage examples
 --------------
   # Single slice locally
   python src/model/run_2d_grid_search_vectorized.py --job-index 0 --n-mc 10
+
+  # Restart after crash — skip completed triples, run missing ones
+  python src/model/run_2d_grid_search_vectorized.py --job-index 0 --n-mc 10 --resume
 
   # Merge all slices after completion
   python src/model/run_2d_grid_search_vectorized.py --merge --save-dir reports/figures/2d_grid_search_vectorized
@@ -236,6 +245,11 @@ def parse_args():
     p.add_argument('--merge', action='store_true',
                    help='Merge per-slice .npz files instead of running')
 
+    # Resume
+    p.add_argument('--resume', action='store_true',
+                   help='Skip triples that already have per-triple .npz files; '
+                        'missing triples are computed normally')
+
     # Job control
     p.add_argument('--job-index', type=int, default=0,
                    help='SLURM_ARRAY_TASK_ID (0-based)')
@@ -364,6 +378,8 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
     n_configs = len(sigma_grid) * len(eta_grid)
     print(f'=== sigma0 slice: idx={i_s0}, sigma0={s0:.4f}, '
           f'{n_configs} configs ===')
+    if args.resume:
+        print('  --resume: will skip triples with existing per-triple files')
 
     # Per-triple output directory
     per_triple_dir = os.path.join(args.save_dir, 'per_triple')
@@ -373,29 +389,44 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
                for isi in isi_values}
 
     count = 0
+    skipped = 0
     t_start = time.perf_counter()
 
     for i_sig, sig in enumerate(sigma_grid):
         for i_eta, eta in enumerate(eta_grid):
+            triple_path = os.path.join(per_triple_dir,
+                                       _triple_filename(s0, sig, eta))
+
+            # --resume: skip if file exists
+            if args.resume and os.path.exists(triple_path):
+                existing = np.load(triple_path, allow_pickle=True)
+                for isi in isi_values:
+                    k = f'dprime_isi{isi}'
+                    if k in existing:
+                        results[isi][i_sig, i_eta] = float(existing[k])
+                skipped += 1
+                count += 1
+                continue
+
             dp, triple_data = run_mc_dprime(s0, sig, eta, **common_kwargs)
+
             for isi in isi_values:
                 results[isi][i_sig, i_eta] = dp.get(isi, np.nan)
 
-            # Save per-triple raw data
-            triple_path = os.path.join(per_triple_dir,
-                                       _triple_filename(s0, sig, eta))
             np.savez(triple_path, **triple_data)
 
             count += 1
             if count % 10 == 0 or count == n_configs:
                 elapsed = time.perf_counter() - t_start
-                rate = count / elapsed
+                rate = count / elapsed if elapsed > 0 else 1
                 remaining = (n_configs - count) / rate if rate > 0 else 0
                 print(f'  {count}/{n_configs} done  '
                       f'({elapsed:.1f}s elapsed, ~{remaining:.0f}s remaining)')
 
     t_total = time.perf_counter() - t_start
     print(f'Slice complete: {count} configs in {t_total:.1f}s')
+    if skipped:
+        print(f'  Skipped (resume): {skipped}')
 
     out_path = os.path.join(args.save_dir, f'grid_slice_s0idx{i_s0}.npz')
     np.savez(out_path,
@@ -407,7 +438,7 @@ def _run_sigma0_slice(args, sigma0_grid, sigma_grid, eta_grid,
              parallel_mode='sigma0',
              **{f'dprime_isi{isi}': results[isi] for isi in isi_values})
     print(f'Saved to {out_path}')
-    print(f'Per-triple data saved to {per_triple_dir}/ ({count} files)')
+    print(f'Per-triple data saved to {per_triple_dir}/ ({count - skipped} new files)')
 
 
 def _run_flat_point(args, sigma0_grid, sigma_grid, eta_grid,
@@ -427,6 +458,19 @@ def _run_flat_point(args, sigma0_grid, sigma_grid, eta_grid,
     per_triple_dir = os.path.join(args.save_dir, 'per_triple')
     os.makedirs(per_triple_dir, exist_ok=True)
 
+    triple_path = os.path.join(per_triple_dir,
+                               _triple_filename(s0, sig, eta))
+
+    # --resume: skip if file exists
+    if args.resume and os.path.exists(triple_path):
+        print(f'Skipping (--resume): {triple_path} already exists')
+        existing = np.load(triple_path, allow_pickle=True)
+        for isi in isi_values:
+            k = f'dprime_isi{isi}'
+            val = float(existing[k]) if k in existing else np.nan
+            print(f"  ISI={isi}: d'={val:.4f}")
+        return
+
     t_start = time.perf_counter()
     dp, triple_data = run_mc_dprime(s0, sig, eta, **common_kwargs)
     t_total = time.perf_counter() - t_start
@@ -435,9 +479,6 @@ def _run_flat_point(args, sigma0_grid, sigma_grid, eta_grid,
     for isi in isi_values:
         print(f"  ISI={isi}: d'={dp.get(isi, np.nan):.4f}")
 
-    # Save per-triple raw data
-    triple_path = os.path.join(per_triple_dir,
-                               _triple_filename(s0, sig, eta))
     np.savez(triple_path, **triple_data)
     print(f'Per-triple data saved to {triple_path}')
 
