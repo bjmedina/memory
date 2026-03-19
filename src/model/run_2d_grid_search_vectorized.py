@@ -7,8 +7,8 @@ vectorised runner ``run_model_core_2d_vec``.
 
 Parallelization modes
 ---------------------
-  sigma0 (default):  Each job processes one sigma0 index → 8 jobs (default grid), 15 jobs (--fine).
-  flat:              Each job processes one (sigma0, sigma, eta) triple → 392 (default) or 2535 (--fine).
+  flat (default):    Each job processes one (sigma0, sigma, eta) triple → 392 (default) or 2535 (--fine).
+  sigma0:            Each job processes one sigma0 index → 8 jobs (default grid), 15 jobs (--fine).
 
 Resume
 ------
@@ -253,8 +253,8 @@ def parse_args():
     # Job control
     p.add_argument('--job-index', type=int, default=0,
                    help='SLURM_ARRAY_TASK_ID (0-based)')
-    p.add_argument('--parallel-mode', type=str, default='sigma0',
-                   choices=['sigma0', 'flat'],
+    p.add_argument('--parallel-mode', type=str, default='flat',
+                   choices=['flat', 'sigma0'],
                    help='Parallelization strategy')
 
     # Grid parameters
