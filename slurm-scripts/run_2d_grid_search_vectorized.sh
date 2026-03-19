@@ -30,6 +30,10 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 #   N_MC=50 ISIS="0 2 16" sbatch slurm-scripts/run_2d_grid_search_vectorized.sh
 #   N_MC=100 METRIC=cosine SEED=123 sbatch slurm-scripts/run_2d_grid_search_vectorized.sh
 #
+# Custom grids (remember to set --array to match total triples - 1):
+#   SIGMA0_GRID="0.0 0.5 1.0" SIGMA_GRID="0.0 0.1 0.2" ETA_GRID="0.0 0.05 0.1" \
+#     sbatch --array=0-26%500 slurm-scripts/run_2d_grid_search_vectorized.sh   # 3×3×3=27 jobs
+#
 # sigma0 mode (fewer, longer jobs — one per sigma0 slice):
 #   PARALLEL_MODE=sigma0 sbatch --array=0-14 slurm-scripts/run_2d_grid_search_vectorized.sh
 #
@@ -51,6 +55,12 @@ N_SEQUENCES="${N_SEQUENCES:-100}"
 SEQ_LENGTH="${SEQ_LENGTH:-99}"
 MIN_PAIRS="${MIN_PAIRS:-5}"
 
+# Custom grids (optional; override --fine when set).
+# Pass as space-separated floats, e.g.: SIGMA0_GRID="0.0 0.25 0.5 0.75 1.0"
+SIGMA0_GRID="${SIGMA0_GRID:-}"
+SIGMA_GRID="${SIGMA_GRID:-}"
+ETA_GRID="${ETA_GRID:-}"
+
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
 echo "N_MC               = $N_MC"
@@ -60,18 +70,29 @@ echo "FINE_GRID          = $FINE_GRID"
 echo "METRIC             = $METRIC"
 echo "SEED               = $SEED"
 echo "SAVE_DIR           = $SAVE_DIR"
+[[ -n "$SIGMA0_GRID" ]] && echo "SIGMA0_GRID        = $SIGMA0_GRID"
+[[ -n "$SIGMA_GRID" ]]  && echo "SIGMA_GRID         = $SIGMA_GRID"
+[[ -n "$ETA_GRID" ]]    && echo "ETA_GRID           = $ETA_GRID"
 echo "======================================="
 
 # =============================
 # EXECUTION
 # =============================
-FINE_ARGS=()
-[[ "$FINE_GRID" == true ]] && FINE_ARGS=(--fine)
+
+# Build optional args: --fine is used unless custom grids are provided.
+GRID_ARGS=()
+if [[ -n "$SIGMA0_GRID" || -n "$SIGMA_GRID" || -n "$ETA_GRID" ]]; then
+    [[ -n "$SIGMA0_GRID" ]] && GRID_ARGS+=(--sigma0-grid $SIGMA0_GRID)
+    [[ -n "$SIGMA_GRID" ]]  && GRID_ARGS+=(--sigma-grid $SIGMA_GRID)
+    [[ -n "$ETA_GRID" ]]    && GRID_ARGS+=(--eta-grid $ETA_GRID)
+else
+    [[ "$FINE_GRID" == true ]] && GRID_ARGS=(--fine)
+fi
 
 python src/model/run_2d_grid_search_vectorized.py \
     --job-index "$SLURM_ARRAY_TASK_ID" \
     --parallel-mode "$PARALLEL_MODE" \
-    "${FINE_ARGS[@]}" \
+    "${GRID_ARGS[@]}" \
     --n-mc "$N_MC" \
     --isis $ISIS \
     --seed "$SEED" \
