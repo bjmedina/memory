@@ -12,7 +12,7 @@
 #   bash slurm-scripts/gather_2d_grid_search.sh
 # ──────────────────────────────────────────────────────────────────────
 #SBATCH -J isi_gather
-#SBATCH -p mit_preemptable
+#SBATCH -p mit_normal_gpu
 #SBATCH -t 0-0:10:00
 #SBATCH -n 1
 #SBATCH -c 1

@@ -7,16 +7,19 @@ vectorised runner ``run_model_core_2d_vec``.
 
 Parallelization modes
 ---------------------
-  sigma0 (default):  Each job processes one sigma0 index → 8 jobs for default grid.
-  flat:              Each job processes one (sigma0, sigma, eta) triple → 392 jobs.
+  sigma0 (default):  Each job processes one sigma0 index → 8 jobs (default grid), 15 jobs (--fine).
+  flat:              Each job processes one (sigma0, sigma, eta) triple → 392 (default) or 2535 (--fine).
+
+Output is written under --save-dir (default: 2d_grid_search_vectorized) so it stays separate from
+the non-vectorized run. Merged file: grid_search_results_vec.npz.
 
 Usage examples
 --------------
   # Single slice locally
-  python src/model/run_2d_grid_search.py --job-index 0 --n-mc 10
+  python src/model/run_2d_grid_search_vectorized.py --job-index 0 --n-mc 10
 
   # Merge all slices after completion
-  python src/model/run_2d_grid_search.py --merge --save-dir reports/figures/2d_grid_search
+  python src/model/run_2d_grid_search_vectorized.py --merge --save-dir reports/figures/2d_grid_search_vectorized
 """
 
 import sys
@@ -47,7 +50,12 @@ from utls.analysis_helpers import auroc_to_dprime
 DEFAULT_SIGMA0 = [0.0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.8, 1.0]
 DEFAULT_SIGMA  = [0.0, 0.025, 0.05, 0.1, 0.15, 0.2, 0.3]
 DEFAULT_ETA    = [0.0, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2]
-DEFAULT_ISIS   = [0, 2, 16]
+DEFAULT_ISIS   = [0, 2, 8, 16]
+
+# Finer grid (~2× resolution per dimension) for --fine
+FINE_SIGMA0 = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9, 1.0]
+FINE_SIGMA  = [0.0, 0.0125, 0.025, 0.0375, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.25, 0.3]
+FINE_ETA    = [0.0, 0.0025, 0.005, 0.0075, 0.01, 0.015, 0.02, 0.035, 0.05, 0.075, 0.1, 0.15, 0.2]
 
 
 # ── MC d-prime ────────────────────────────────────────────────────────
@@ -188,11 +196,13 @@ def parse_args():
                    help='Parallelization strategy')
 
     # Grid parameters
-    p.add_argument('--sigma0-grid', type=float, nargs='+', default=DEFAULT_SIGMA0,
-                   help='Sigma0 (encoding noise) grid values')
-    p.add_argument('--sigma-grid', type=float, nargs='+', default=DEFAULT_SIGMA,
+    p.add_argument('--fine', action='store_true',
+                   help='Use finer grid (~2× resolution per dimension; more triples)')
+    p.add_argument('--sigma0-grid', type=float, nargs='+', default=None,
+                   help='Sigma0 (encoding noise) grid values (default: from --fine or coarse grid)')
+    p.add_argument('--sigma-grid', type=float, nargs='+', default=None,
                    help='Sigma (diffusive noise) grid values')
-    p.add_argument('--eta-grid', type=float, nargs='+', default=DEFAULT_ETA,
+    p.add_argument('--eta-grid', type=float, nargs='+', default=None,
                    help='Eta (drift step size) grid values')
 
     # Experiment parameters
@@ -211,10 +221,10 @@ def parse_args():
     p.add_argument('--metric', type=str, default='euclidean',
                    help='Distance metric')
 
-    # Output
+    # Output (default distinct from non-vectorized 2d_grid_search)
     p.add_argument('--save-dir', type=str,
-                   default='reports/figures/2d_grid_search',
-                   help='Output directory for results')
+                   default='reports/figures/2d_grid_search_vectorized',
+                   help='Output directory for results (vectorized outputs stay separate)')
 
     return p.parse_args()
 
@@ -229,9 +239,18 @@ def main():
         return
 
     # ── grids ─────────────────────────────────────────────────────────
-    sigma0_grid = np.array(args.sigma0_grid)
-    sigma_grid = np.array(args.sigma_grid)
-    eta_grid = np.array(args.eta_grid)
+    if args.sigma0_grid is not None:
+        sigma0_grid = np.array(args.sigma0_grid)
+    else:
+        sigma0_grid = np.array(FINE_SIGMA0 if args.fine else DEFAULT_SIGMA0)
+    if args.sigma_grid is not None:
+        sigma_grid = np.array(args.sigma_grid)
+    else:
+        sigma_grid = np.array(FINE_SIGMA if args.fine else DEFAULT_SIGMA)
+    if args.eta_grid is not None:
+        eta_grid = np.array(args.eta_grid)
+    else:
+        eta_grid = np.array(FINE_ETA if args.fine else DEFAULT_ETA)
     isi_values = tuple(args.isis)
 
     # ── validate job index ────────────────────────────────────────────
