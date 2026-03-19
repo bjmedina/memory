@@ -1,0 +1,98 @@
+#!/bin/bash
+#SBATCH -J 3step_grid_search
+#SBATCH -p mit_normal_gpu
+#SBATCH -t 0-0:30:00
+#SBATCH -n 1
+#SBATCH -c 1
+#SBATCH --mem=4G
+## Flat mode: one job per (sigma0, sigma1, sigma2) triple.
+## Fine grid: 15 x 13 x 13 = 2535 triples → array 0-2534.
+## %500 throttle limits concurrent jobs.
+#SBATCH --array=0-2534%500
+#SBATCH -o slurm-scripts/logs/%x_%A_%a.out
+#SBATCH -e slurm-scripts/logs/%x_%A_%a.err
+
+# =============================
+# ENVIRONMENT SETUP
+# =============================
+source activate /orcd/data/jhm/001/gelbanna/miniconda3/envs/asr_312
+cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
+
+# =============================
+# CONFIGURABLE PARAMETERS
+# (override via env vars when submitting)
+#
+# Examples:
+#   sbatch slurm-scripts/run_3step_grid_search.sh                    # fine grid, flat mode
+#   N_MC=50 ISIS="0 2 16" sbatch slurm-scripts/run_3step_grid_search.sh
+#   T_STEP=8 sbatch slurm-scripts/run_3step_grid_search.sh
+#
+# Custom grids (set --array to match total triples - 1):
+#   SIGMA0_GRID="0.0 0.5 1.0" SIGMA1_GRID="0.0 0.1 0.2" SIGMA2_GRID="0.0 0.05 0.1" \
+#     sbatch --array=0-26%500 slurm-scripts/run_3step_grid_search.sh  # 3x3x3=27
+#
+# sigma0 mode (fewer, longer jobs):
+#   PARALLEL_MODE=sigma0 sbatch --array=0-14 slurm-scripts/run_3step_grid_search.sh
+# =============================
+
+N_MC=${N_MC:-10}
+ISIS="${ISIS:-0 2 8 16}"
+PARALLEL_MODE="${PARALLEL_MODE:-flat}"
+FINE_GRID="${FINE_GRID:-true}"
+SAVE_DIR="${SAVE_DIR:-reports/figures/3step_grid_search}"
+SEED="${SEED:-43}"
+METRIC="${METRIC:-euclidean}"
+T_STEP="${T_STEP:-5}"
+N_SEQUENCES="${N_SEQUENCES:-100}"
+SEQ_LENGTH="${SEQ_LENGTH:-99}"
+MIN_PAIRS="${MIN_PAIRS:-5}"
+
+# Custom grids (optional; override --fine when set).
+SIGMA0_GRID="${SIGMA0_GRID:-}"
+SIGMA1_GRID="${SIGMA1_GRID:-}"
+SIGMA2_GRID="${SIGMA2_GRID:-}"
+
+echo "======================================="
+echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
+echo "N_MC               = $N_MC"
+echo "ISIS               = $ISIS"
+echo "PARALLEL_MODE      = $PARALLEL_MODE"
+echo "FINE_GRID          = $FINE_GRID"
+echo "METRIC             = $METRIC"
+echo "SEED               = $SEED"
+echo "T_STEP             = $T_STEP"
+echo "SAVE_DIR           = $SAVE_DIR"
+[[ -n "$SIGMA0_GRID" ]] && echo "SIGMA0_GRID        = $SIGMA0_GRID"
+[[ -n "$SIGMA1_GRID" ]] && echo "SIGMA1_GRID        = $SIGMA1_GRID"
+[[ -n "$SIGMA2_GRID" ]] && echo "SIGMA2_GRID        = $SIGMA2_GRID"
+echo "======================================="
+
+# =============================
+# EXECUTION
+# =============================
+
+GRID_ARGS=()
+if [[ -n "$SIGMA0_GRID" || -n "$SIGMA1_GRID" || -n "$SIGMA2_GRID" ]]; then
+    [[ -n "$SIGMA0_GRID" ]] && GRID_ARGS+=(--sigma0-grid $SIGMA0_GRID)
+    [[ -n "$SIGMA1_GRID" ]] && GRID_ARGS+=(--sigma1-grid $SIGMA1_GRID)
+    [[ -n "$SIGMA2_GRID" ]] && GRID_ARGS+=(--sigma2-grid $SIGMA2_GRID)
+else
+    [[ "$FINE_GRID" == true ]] && GRID_ARGS=(--fine)
+fi
+
+python src/model/run_3step_grid_search.py \
+    --job-index "$SLURM_ARRAY_TASK_ID" \
+    --parallel-mode "$PARALLEL_MODE" \
+    "${GRID_ARGS[@]}" \
+    --n-mc "$N_MC" \
+    --isis $ISIS \
+    --seed "$SEED" \
+    --metric "$METRIC" \
+    --t-step "$T_STEP" \
+    --n-sequences "$N_SEQUENCES" \
+    --seq-length "$SEQ_LENGTH" \
+    --min-pairs-per-isi "$MIN_PAIRS" \
+    --save-dir "$SAVE_DIR" \
+    --resume
+
+echo "Done: job_index=$SLURM_ARRAY_TASK_ID"
