@@ -6,9 +6,8 @@
 #SBATCH -c 1
 #SBATCH --mem=16G
 #SBATCH --gres=gpu:1
-## sigma0 mode: one job per sigma0 value (20 values).
-## Each job sweeps all 20x20=400 (sigma1, sigma2) combos.
-#SBATCH --array=0-19
+## Array range and OFFSET are set by submit_3step_batches.sh.
+## To run standalone: sbatch --array=0-14 slurm-scripts/run_3step_grid_search.sh
 #SBATCH -o slurm-scripts/logs/%x_%A_%a.out
 #SBATCH -e slurm-scripts/logs/%x_%A_%a.out
 
@@ -42,8 +41,13 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 # SIGMA1_GRID="${SIGMA1_GRID:-}"
 # SIGMA2_GRID="${SIGMA2_GRID:-}"
 
+OFFSET=${OFFSET:-0}
+JOB_INDEX=$(( OFFSET + SLURM_ARRAY_TASK_ID ))
+
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
+echo "OFFSET              = $OFFSET"
+echo "JOB_INDEX           = $JOB_INDEX"
 echo "======================================="
 
 # =============================
@@ -51,7 +55,8 @@ echo "======================================="
 # =============================
 
 python src/model/run_3step_grid_search.py \
-    --job-index "$SLURM_ARRAY_TASK_ID" \
+    --job-index "$JOB_INDEX" \
+    --parallel-mode flat \
     --resume
 
-echo "Done: job_index=$SLURM_ARRAY_TASK_ID"
+echo "Done: job_index=$JOB_INDEX"
