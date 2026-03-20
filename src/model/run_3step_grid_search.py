@@ -75,11 +75,14 @@ from utls.analysis_helpers import auroc_to_dprime
 
 # ── defaults ──────────────────────────────────────────────────────────
 # Broad geomspace grids for exploratory sweep (15 values each)
-DEFAULT_SIGMA0 = np.geomspace(0.1, 50, 15).tolist()
-DEFAULT_SIGMA1 = np.geomspace(0.01, 30, 15).tolist()
-DEFAULT_SIGMA2 = np.geomspace(0.001, 30, 15).tolist()
+DEFAULT_SIGMA0 = [0.0] + np.geomspace(0.1, 50, 14).tolist()
+DEFAULT_SIGMA1 = [0.0] + np.geomspace(0.01, 30, 14).tolist()
+DEFAULT_SIGMA2 = [0.0] + np.geomspace(0.001, 30, 14).tolist()
 DEFAULT_ISIS   = [0, 1, 2, 4, 8, 16, 32, 64]
 
+# SIGMA=0 is the no percepetual encoding noise model
+# if sigma1 == sigma2, then we have a constant noise regime
+# if sigma1 != sigma2, then we have a 3-step noise regime
 
 # ── MC d-prime ────────────────────────────────────────────────────────
 
@@ -289,15 +292,15 @@ def parse_args():
                    help='Age threshold for switching sigma1 -> sigma2')
 
     # Experiment parameters
-    p.add_argument('--n-mc', type=int, default=1,
+    p.add_argument('--n-mc', type=int, default=10,
                    help='Monte Carlo repetitions per config')
     p.add_argument('--isis', type=int, nargs='+', default=DEFAULT_ISIS,
                    help='ISI values to evaluate')
-    p.add_argument('--n-sequences', type=int, default=15,
+    p.add_argument('--n-sequences', type=int, default=30,
                    help='Number of experiment sequences')
     p.add_argument('--seq-length', type=int, default=120,
                    help='Length of each sequence')
-    p.add_argument('--min-pairs-per-isi', type=int, default=5,
+    p.add_argument('--min-pairs-per-isi', type=int, default=4,
                    help='Minimum repeat pairs per ISI per sequence')
     p.add_argument('--seed', type=int, default=44,
                    help='Base random seed')
@@ -324,7 +327,7 @@ def parse_args():
 
     # Output
     p.add_argument('--save-dir', type=str,
-                   default='reports/figures/3step_grid_search_t5',
+                   default='reports/figures/3step_grid_search',
                    help='Output directory for results')
 
     return p.parse_args()
@@ -334,6 +337,7 @@ def main():
     print("Starting 3-step grid search...")
     args = parse_args()
     os.makedirs(args.save_dir, exist_ok=True)
+    print(args)
 
     # ── merge mode ────────────────────────────────────────────────────
     if args.merge:
@@ -388,6 +392,7 @@ def main():
         device=args.device,
         layer=args.layer,
     )
+    
     print(f'Building encoder: {args.encoder_type} / {args.layer} ...')
     encoder = build_encoder(encoder_cfg)
     print(f'Encoding {len(all_files)} stimuli ...')
@@ -395,6 +400,12 @@ def main():
     print(f'X0 shape: {X0.shape}')
 
     stimulus_pool = sorted({s for seq in exp_list for s in seq})
+
+    print(f"make_high_diversity_sequences parameters:")
+    print(f"  n_sequences = {args.n_sequences}")
+    print(f"  length = {args.seq_length}")
+    print(f"  min_pairs_per_isi = {args.min_pairs_per_isi}")
+    print(f"  isi_values = {list(isi_values)}")
 
     experiment_list, isi_keys = make_high_diversity_sequences(
         stimulus_pool=stimulus_pool,
@@ -412,7 +423,7 @@ def main():
     print(f't_step: {args.t_step}')
     print(f'Grid: {len(sigma0_grid)} x {len(sigma1_grid)} x {len(sigma2_grid)} '
           f'= {len(sigma0_grid) * len(sigma1_grid) * len(sigma2_grid)} configs')
-    print(f'Parallel mode: {args.parallel_mode}, job index: {args.job_index}')
+    print(f'Parallel mode: {args.parallel_mode}')
     print()
 
     common_kwargs = dict(

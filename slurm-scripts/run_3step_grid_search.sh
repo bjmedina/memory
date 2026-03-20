@@ -1,14 +1,13 @@
 #!/bin/bash
-#SBATCH -J 3step_grid_t5
-#SBATCH -p mit_normal_gpu
-#SBATCH -t 0-1:30:00
+#SBATCH -J 3step_grid
+#SBATCH -p ou_bcs_low
+#SBATCH -t 0-0:15:00
 #SBATCH -n 1
 #SBATCH -c 1
 #SBATCH --mem=16G
 #SBATCH --gres=gpu:1
-## sigma0 mode: one job per sigma0 value (20 values).
-## Each job sweeps all 20x20=400 (sigma1, sigma2) combos.
-#SBATCH --array=0-19
+## Default array size; submit script overrides --array for the last (shorter) chunk.
+#SBATCH --array=0-149
 #SBATCH -o slurm-scripts/logs/%x_%A_%a.out
 #SBATCH -e slurm-scripts/logs/%x_%A_%a.out
 
@@ -18,40 +17,47 @@
 conda activate /orcd/data/jhm/001/bjmedina/miniconda3/envs/asr_312_312
 cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
+# Flat index for Python:
+#   JOB_INDEX = GLOBAL_BASE + SLURM_ARRAY_TASK_ID
+# GLOBAL_BASE / OFFSET / CHUNK_SIZE: set by submit_3step_grid_search_in_chunks.sh via sbatch --export=...
+# Fallback (manual run): OFFSET=0 → JOB_INDEX = SLURM_ARRAY_TASK_ID
+CHUNK_SIZE=150
+OFFSET=1
+TASK_LOCAL="$SLURM_ARRAY_TASK_ID"
+
+JOB_INDEX=$(( OFFSET * CHUNK_SIZE + TASK_LOCAL ))                                                                                                                                                                              
+
 # =============================
-# CONFIGURABLE PARAMETERS (commented out — all use Python defaults now)
-# Uncomment and pass as env vars to override, e.g.:
-#   N_MC=50 sbatch slurm-scripts/run_3step_grid_search.sh
+# CONFIGURABLE PARAMETERS
 # =============================
 
-# N_MC=${N_MC:-10}
-# ISIS="${ISIS:-0 1 2 4 8 16 32 64}"
-# PARALLEL_MODE="${PARALLEL_MODE:-sigma0}"
-# SAVE_DIR="${SAVE_DIR:-reports/figures/3step_grid_search_t5}"
-# SEED="${SEED:-43}"
-# METRIC="${METRIC:-cosine}"
-# WHICH_TASK="${WHICH_TASK:-0}"
-# ENCODER="${ENCODER:-resnet50}"
-# LAYER="${LAYER:-layer4}"
-# DEVICE="${DEVICE:-cuda}"
-# T_STEP="${T_STEP:-5}"
-# N_SEQUENCES="${N_SEQUENCES:-100}"
-# SEQ_LENGTH="${SEQ_LENGTH:-120}"
-# MIN_PAIRS="${MIN_PAIRS:-5}"
-# SIGMA0_GRID="${SIGMA0_GRID:-}"
-# SIGMA1_GRID="${SIGMA1_GRID:-}"
-# SIGMA2_GRID="${SIGMA2_GRID:-}"
+PARALLEL_MODE="flat"
+METRIC="cosine"
+T_STEP=5
+N_MC=5
+SAVE_DIR="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/3step_grid_search_metric-${METRIC}_t${T_STEP}_nmc${N_MC}"
 
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
+echo "OFFSET              = $OFFSET"
+echo "CHUNK_SIZE          = $CHUNK_SIZE"
+echo "JOB_INDEX           = $JOB_INDEX  (flat index for Python)"
+echo "T_STEP              = $T_STEP"
+echo "PARALLEL_MODE       = $PARALLEL_MODE"
+echo "METRIC              = $METRIC"
+echo "SAVE_DIR            = $SAVE_DIR"
 echo "======================================="
 
 # =============================
 # EXECUTION
 # =============================
 
-python src/model/run_3step_grid_search.py \
-    --job-index "$SLURM_ARRAY_TASK_ID" \
-    --resume
+python /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/run_3step_grid_search.py \
+    --job-index "$JOB_INDEX" \
+    --parallel-mode "$PARALLEL_MODE" \
+    --t-step "$T_STEP" \
+    --metric "$METRIC" \
+    --save-dir "$SAVE_DIR" \
+    --n-mc "$N_MC" 
 
-echo "Done: job_index=$SLURM_ARRAY_TASK_ID"
+echo "Done: job_index=$JOB_INDEX"
