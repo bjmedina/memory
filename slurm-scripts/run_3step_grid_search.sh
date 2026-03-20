@@ -12,8 +12,6 @@
 #SBATCH -o slurm-scripts/logs/%x_%A_%a.out
 #SBATCH -e slurm-scripts/logs/%x_%A_%a.out
 
-set -eo pipefail
-
 # =============================
 # ENVIRONMENT SETUP
 # =============================
