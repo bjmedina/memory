@@ -38,6 +38,16 @@ from collections import defaultdict
 
 import numpy as np
 
+import types
+
+# Mock 'cox' and 'cox.store' so constants.py doesn't crash
+cox_mock = types.ModuleType('cox')
+store_mock = types.ModuleType('cox.store')
+store_mock.PYTORCH_STATE = 'pytorch_state'  # the only attr actually used
+cox_mock.store = store_mock
+sys.modules['cox'] = cox_mock
+sys.modules['cox.store'] = store_mock
+
 # ── path setup ────────────────────────────────────────────────────────
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..'))
@@ -64,10 +74,10 @@ from utls.analysis_helpers import auroc_to_dprime
 
 
 # ── defaults ──────────────────────────────────────────────────────────
-# Broad geomspace grids for exploratory sweep (20 values each)
-DEFAULT_SIGMA0 = np.geomspace(0.1, 50, 20).tolist()
-DEFAULT_SIGMA1 = np.geomspace(0.01, 30, 20).tolist()
-DEFAULT_SIGMA2 = np.geomspace(0.001, 30, 20).tolist()
+# Broad geomspace grids for exploratory sweep (15 values each)
+DEFAULT_SIGMA0 = np.geomspace(0.1, 50, 15).tolist()
+DEFAULT_SIGMA1 = np.geomspace(0.01, 30, 15).tolist()
+DEFAULT_SIGMA2 = np.geomspace(0.001, 30, 15).tolist()
 DEFAULT_ISIS   = [0, 1, 2, 4, 8, 16, 32, 64]
 
 
@@ -279,17 +289,17 @@ def parse_args():
                    help='Age threshold for switching sigma1 -> sigma2')
 
     # Experiment parameters
-    p.add_argument('--n-mc', type=int, default=10,
+    p.add_argument('--n-mc', type=int, default=1,
                    help='Monte Carlo repetitions per config')
     p.add_argument('--isis', type=int, nargs='+', default=DEFAULT_ISIS,
                    help='ISI values to evaluate')
-    p.add_argument('--n-sequences', type=int, default=100,
+    p.add_argument('--n-sequences', type=int, default=15,
                    help='Number of experiment sequences')
     p.add_argument('--seq-length', type=int, default=120,
                    help='Length of each sequence')
     p.add_argument('--min-pairs-per-isi', type=int, default=5,
                    help='Minimum repeat pairs per ISI per sequence')
-    p.add_argument('--seed', type=int, default=43,
+    p.add_argument('--seed', type=int, default=44,
                    help='Base random seed')
     p.add_argument('--metric', type=str, default='cosine',
                    help='Distance metric')
@@ -321,14 +331,17 @@ def parse_args():
 
 
 def main():
+    print("Starting 3-step grid search...")
     args = parse_args()
     os.makedirs(args.save_dir, exist_ok=True)
 
     # ── merge mode ────────────────────────────────────────────────────
     if args.merge:
+        print("Merging results...")
         merge_results(args.save_dir)
         return
 
+    print("Setting up grids...")
     # ── grids ─────────────────────────────────────────────────────────
     if args.sigma0_grid is not None:
         sigma0_grid = np.array(args.sigma0_grid)
@@ -344,10 +357,13 @@ def main():
         sigma2_grid = np.array(DEFAULT_SIGMA2)
     isi_values = tuple(args.isis)
 
+    print("Validating job index...")
     # ── validate job index ────────────────────────────────────────────
     if args.parallel_mode == 'sigma0':
+        print("Parallel mode: sigma0")
         total_jobs = len(sigma0_grid)
     else:
+        print("Parallel mode: flat")
         total_jobs = len(sigma0_grid) * len(sigma1_grid) * len(sigma2_grid)
 
     if args.job_index >= total_jobs:
@@ -407,6 +423,7 @@ def main():
         seed=args.seed, metric=args.metric,
     )
 
+    print("Dispatching...")
     # ── dispatch ──────────────────────────────────────────────────────
     if args.parallel_mode == 'sigma0':
         _run_sigma0_slice(args, sigma0_grid, sigma1_grid, sigma2_grid,
@@ -545,4 +562,5 @@ def _run_flat_point(args, sigma0_grid, sigma1_grid, sigma2_grid,
 
 
 if __name__ == '__main__':
+    print("Starting 3-step grid search...")
     main()
