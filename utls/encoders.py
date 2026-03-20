@@ -9,7 +9,7 @@ import os
 import tempfile
 from sklearn.decomposition import PCA
 
-# sys.path.append('/om2/user/bjmedina/')
+# sys.path.append('/orcd/data/jhm/001/om2/bjmedina/')
 
 # from chexture_choolbox.auditorytexture.statistics_sets import (
 #     STAT_SET_FULL_MCDERMOTTSIMONCELLI as statistics_dict
@@ -18,7 +18,7 @@ from sklearn.decomposition import PCA
 # from chexture_choolbox.auditorytexture.helpers import FlattenStats
 # from texture_prior.params import model_params
 
-sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/')
 
 from chexture_choolbox.auditorytexture.texture_model import TextureModel
 from chexture_choolbox.auditorytexture.helpers import FlattenStats
@@ -27,8 +27,8 @@ from texture_prior.params import model_params, statistics_set, texture_dataset
 from texture_prior.utils import path, normalization
 
 
-sys.path.append('/om/user/jmhicks/projects/TextureSimilarity/code/')
-import texture_similarity.utils as ts
+# sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureSimilarity/code/')
+# import texture_similarity.utils as ts
 
 
 import scipy.signal
@@ -101,7 +101,7 @@ class AudioTextureEncoderPCA(nn.Module):
         self.duration = duration
         self.device = device
 
-        principal_components_path = "/om2/user/jmhicks/projects/TextureStreaming/code/texture_prior/assets/principal_components.pt"
+        principal_components_path = "/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/texture_prior/assets/principal_components.pt"
         principal_components = torch.load(principal_components_path)
         principal_components = principal_components['PCs'].cuda()
         
@@ -198,8 +198,8 @@ class Kell2018Encoder(nn.Module):
 
     from sklearn.decomposition import PCA
     
-    sys.path.append('/om/user/jmhicks/projects/TextureSimilarity/code/')
-    import texture_similarity.utils as ts
+    # sys.path.append('/om/user/jmhicks/projects/TextureSimilarity/code/')
+    # import texture_similarity.utils as ts
 
     
     import scipy.signal
@@ -218,7 +218,7 @@ class Kell2018Encoder(nn.Module):
         self.duration = duration
         self.device = device
 
-        cochdnn_dir = '/om2/user/bjmedina/models/cochdnn/'
+        cochdnn_dir = '/orcd/data/jhm/001/om2/bjmedina/models/cochdnn/'
         sys.path.append(cochdnn_dir)
     
         model_dir = os.path.join(cochdnn_dir, 'model_directories', model_name)
@@ -376,8 +376,8 @@ class ResNet50Encoder(nn.Module):
 
     from sklearn.decomposition import PCA
     
-    sys.path.append('/om/user/jmhicks/projects/TextureSimilarity/code/')
-    import texture_similarity.utils as ts
+    # sys.path.append('/om/user/jmhicks/projects/TextureSimilarity/code/')
+    # import texture_similarity.utils as ts
 
     
     import scipy.signal
@@ -396,7 +396,7 @@ class ResNet50Encoder(nn.Module):
         self.duration = duration
         self.device = device
 
-        cochdnn_dir = '/om2/user/bjmedina/models/cochdnn/'
+        cochdnn_dir = '/orcd/data/jhm/001/om2/bjmedina/models/cochdnn/'
         sys.path.append(cochdnn_dir)
     
         model_dir = os.path.join(cochdnn_dir, 'model_directories', model_name)

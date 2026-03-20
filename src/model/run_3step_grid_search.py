@@ -44,10 +44,10 @@ _REPO_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..'))
 sys.path.insert(0, _REPO_ROOT)
 
 # cluster paths (needed for encoder pipeline)
-sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
-sys.path.append('/om2/user/bjmedina/auditory-memory/memory/utls/')
-sys.path.append('/om2/user/bjmedina/auditory-memory/memory/src/model/')
-sys.path.append('/om2/user/bjmedina/auditory-memory/memory/')
+sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/utls/')
+sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/')
+sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/')
 
 import torch
 

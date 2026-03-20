@@ -14,10 +14,10 @@ from pathlib import Path
 
 
 # project-specific paths
-sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
-sys.path.append('../utls/')
-sys.path.append('../src/model/')
-sys.path.append("/om2/user/bjmedina/auditory-memory/memory/")
+sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/utls/')
+sys.path.append('/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/')
+sys.path.append("/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/")
 
 from chexture_choolbox.auditorytexture.texture_model import TextureModel
 from chexture_choolbox.auditorytexture.helpers import FlattenStats
@@ -76,10 +76,10 @@ def load_experiment_data(which_task, which_isi, is_multi, old=False):
     if not is_multi:
         tasks = ["ind-nature-len120", "global-music-len120",
                  "atexts-len120", "nhs-region-len120"]
-        base_path = f"/mindhive/mcdermott/www/mturk_stimuli/bjmedina/{{}}/sequences/isi_{which_isi}/len120/"
+        base_path = f"/orcd/data/jhm/001/om2/bjmedina/mindhive/mcdermott/www/mturk_stimuli/bjmedina/{{}}/sequences/isi_{which_isi}/len120/"
     else:
         tasks = ["env-sounds", "glob-music", "atexts", "nhs-region-len120"]
-        base_path = "/mindhive/mcdermott/www/mturk_stimuli/bjmedina/{}/sequences/len120_multi/"
+        base_path = "/orcd/data/jhm/001/om2/bjmedina/mindhive/mcdermott/www/mturk_stimuli/bjmedina/{}/sequences/len120_multi/"
 
     task_name = tasks[which_task]
 
@@ -101,13 +101,13 @@ def load_experiment_data(which_task, which_isi, is_multi, old=False):
     # load human data
     if not is_multi:
         exps, seqs, fnames, _, _, _ = load_results_with_exclusion_no_dropping(
-            f"/mindhive/mcdermott/www/bjmedina/experiments/bolivia_2025/results/"
+            f"/orcd/data/jhm/001/om2/bjmedina/mindhive/mcdermott/www/bjmedina/experiments/bolivia_2025/results/"
             f"isi_{which_isi}/{task_name}",
             min_dprime=2, min_trials=120, skip_len60=True,
             verbose=False, return_skipped=True)
     else:
         exps, seqs, fnames, _, _, _ = load_results_with_exclusion_no_dropping(
-            f"/mindhive/mcdermott/www/bjmedina/experiments/{task_name}/results/"
+            f"/orcd/data/jhm/001/om2/bjmedina/mindhive/mcdermott/www/bjmedina/experiments/{task_name}/results/"
             f"{task_name}/len120_multi",
             min_dprime=2, min_trials=120, skip_len60=True,
             verbose=False, return_skipped=True)
@@ -262,8 +262,8 @@ def compute_model_dprime_for_run(run_out, isis):
 
 def build_encoder(cfg):
 
-    sys.path.append(f'/om2/user/bjmedina/models/cochdnn/model_directories/{cfg['model_name']}_{cfg['task']}/')
-    print("LOADING FROM", f'/om2/user/bjmedina/models/cochdnn/model_directories/{cfg['model_name']}_{cfg['task']}/')
+    sys.path.append(f'/orcd/data/jhm/001/om2/bjmedina/models/cochdnn/model_directories/{cfg['model_name']}_{cfg['task']}/')
+    print("LOADING FROM", f'/orcd/data/jhm/001/om2/bjmedina/models/cochdnn/model_directories/{cfg['model_name']}_{cfg['task']}/')
        
     etype = cfg["encoder_type"]
 

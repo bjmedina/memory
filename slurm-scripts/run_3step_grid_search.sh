@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J 3step_grid_t5
 #SBATCH -p mit_normal_gpu
-#SBATCH -t 0-0:30:00
+#SBATCH -t 0-1:30:00
 #SBATCH -n 1
 #SBATCH -c 1
 #SBATCH --mem=16G
