@@ -1,6 +1,6 @@
 #!/bin/bash
 # ──────────────────────────────────────────────────────────────────────
-# Merge per-triple .npz files into a single grid_search_results_3step.npz.
+# Merge per-triple .npz files into a single grid_search_results_3step_t5.npz.
 # Run after the 3-step grid search array job completes.
 #
 # Usage:
@@ -11,7 +11,7 @@
 #   # Or run manually:
 #   bash slurm-scripts/gather_3step_grid_search.sh
 # ──────────────────────────────────────────────────────────────────────
-#SBATCH -J 3step_grid_gather
+#SBATCH -J 3step_grid_gather_t5
 #SBATCH -p mit_normal_gpu
 #SBATCH -t 0-0:10:00
 #SBATCH -n 1
@@ -23,7 +23,7 @@
 source activate /orcd/data/jhm/001/gelbanna/miniconda3/envs/asr_312
 cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
-SAVE_DIR="${SAVE_DIR:-reports/figures/3step_grid_search}"
+SAVE_DIR="${SAVE_DIR:-reports/figures/3step_grid_search_t5}"
 
 echo "Merging results from: $SAVE_DIR"
 

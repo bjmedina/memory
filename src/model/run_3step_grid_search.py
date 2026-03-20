@@ -17,8 +17,8 @@ Resume
 ------
   --resume       Skip triples that already have a per-triple .npz file.
 
-Output is written under --save-dir (default: reports/figures/3step_grid_search).
-Merged file: grid_search_results_3step.npz.
+Output is written under --save-dir (default: reports/figures/3step_grid_search_t5).
+Merged file: grid_search_results_3step_t5.npz.
 
 Usage examples
 --------------
@@ -26,7 +26,7 @@ Usage examples
   python src/model/run_3step_grid_search.py --job-index 0 --n-mc 10
 
   # Merge all slices after completion
-  python src/model/run_3step_grid_search.py --merge --save-dir reports/figures/3step_grid_search
+  python src/model/run_3step_grid_search.py --merge --save-dir reports/figures/3step_grid_search_t5
 """
 
 import sys
@@ -64,15 +64,11 @@ from utls.analysis_helpers import auroc_to_dprime
 
 
 # ── defaults ──────────────────────────────────────────────────────────
-DEFAULT_SIGMA0 = [0.0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.8, 1.0]
-DEFAULT_SIGMA1 = [0.0, 0.025, 0.05, 0.1, 0.15, 0.2, 0.3]
-DEFAULT_SIGMA2 = [0.0, 0.025, 0.05, 0.1, 0.15, 0.2, 0.3]
+# Broad geomspace grids for exploratory sweep (20 values each)
+DEFAULT_SIGMA0 = np.geomspace(0.1, 50, 20).tolist()
+DEFAULT_SIGMA1 = np.geomspace(0.01, 30, 20).tolist()
+DEFAULT_SIGMA2 = np.geomspace(0.001, 30, 20).tolist()
 DEFAULT_ISIS   = [0, 2, 8, 16]
-
-# Finer grid (~2x resolution per dimension) for --fine
-FINE_SIGMA0 = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9, 1.0]
-FINE_SIGMA1 = [0.0, 0.0125, 0.025, 0.0375, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.25, 0.3]
-FINE_SIGMA2 = [0.0, 0.0125, 0.025, 0.0375, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.25, 0.3]
 
 
 # ── MC d-prime ────────────────────────────────────────────────────────
@@ -178,7 +174,7 @@ def run_mc_dprime(sigma0, sigma1, sigma2, *,
 # ── merge mode ────────────────────────────────────────────────────────
 
 def merge_results(save_dir):
-    """Merge per-slice .npz files into a single grid_search_results_3step.npz."""
+    """Merge per-slice .npz files into a single grid_search_results_3step_t5.npz."""
     sigma0_files = sorted(glob(os.path.join(save_dir, 'grid_slice_s0idx*.npz')))
     flat_files = sorted(glob(os.path.join(save_dir, 'grid_point_*.npz')))
 
@@ -237,7 +233,7 @@ def merge_results(save_dir):
         n_missing = total_expected - n_filled
         print(f'  WARNING: {n_missing} grid points are missing (NaN)')
 
-    out_path = os.path.join(save_dir, 'grid_search_results_3step.npz')
+    out_path = os.path.join(save_dir, 'grid_search_results_3step_t5.npz')
     np.savez(out_path,
              sigma0_grid=sigma0_grid,
              sigma1_grid=sigma1_grid,
@@ -271,8 +267,6 @@ def parse_args():
                    help='Parallelization strategy')
 
     # Grid parameters
-    p.add_argument('--fine', action='store_true',
-                   help='Use finer grid (~2x resolution per dimension)')
     p.add_argument('--sigma0-grid', type=float, nargs='+', default=None,
                    help='Sigma0 (encoding noise) grid values')
     p.add_argument('--sigma1-grid', type=float, nargs='+', default=None,
@@ -320,7 +314,7 @@ def parse_args():
 
     # Output
     p.add_argument('--save-dir', type=str,
-                   default='reports/figures/3step_grid_search',
+                   default='reports/figures/3step_grid_search_t5',
                    help='Output directory for results')
 
     return p.parse_args()
@@ -339,15 +333,15 @@ def main():
     if args.sigma0_grid is not None:
         sigma0_grid = np.array(args.sigma0_grid)
     else:
-        sigma0_grid = np.array(FINE_SIGMA0 if args.fine else DEFAULT_SIGMA0)
+        sigma0_grid = np.array(DEFAULT_SIGMA0)
     if args.sigma1_grid is not None:
         sigma1_grid = np.array(args.sigma1_grid)
     else:
-        sigma1_grid = np.array(FINE_SIGMA1 if args.fine else DEFAULT_SIGMA1)
+        sigma1_grid = np.array(DEFAULT_SIGMA1)
     if args.sigma2_grid is not None:
         sigma2_grid = np.array(args.sigma2_grid)
     else:
-        sigma2_grid = np.array(FINE_SIGMA2 if args.fine else DEFAULT_SIGMA2)
+        sigma2_grid = np.array(DEFAULT_SIGMA2)
     isi_values = tuple(args.isis)
 
     # ── validate job index ────────────────────────────────────────────
