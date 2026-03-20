@@ -10,7 +10,9 @@
 ## Each job sweeps all 20x20=400 (sigma1, sigma2) combos.
 #SBATCH --array=0-19
 #SBATCH -o slurm-scripts/logs/%x_%A_%a.out
-#SBATCH -e slurm-scripts/logs/%x_%A_%a.err
+#SBATCH -e slurm-scripts/logs/%x_%A_%a.out
+
+set -eo pipefail
 
 # =============================
 # ENVIRONMENT SETUP
