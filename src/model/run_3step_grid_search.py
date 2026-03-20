@@ -68,7 +68,7 @@ from utls.analysis_helpers import auroc_to_dprime
 DEFAULT_SIGMA0 = np.geomspace(0.1, 50, 20).tolist()
 DEFAULT_SIGMA1 = np.geomspace(0.01, 30, 20).tolist()
 DEFAULT_SIGMA2 = np.geomspace(0.001, 30, 20).tolist()
-DEFAULT_ISIS   = [0, 2, 8, 16]
+DEFAULT_ISIS   = [0, 1, 2, 4, 8, 16, 32, 64]
 
 
 # ── MC d-prime ────────────────────────────────────────────────────────
@@ -262,7 +262,7 @@ def parse_args():
     # Job control
     p.add_argument('--job-index', type=int, default=0,
                    help='SLURM_ARRAY_TASK_ID (0-based)')
-    p.add_argument('--parallel-mode', type=str, default='flat',
+    p.add_argument('--parallel-mode', type=str, default='sigma0',
                    choices=['flat', 'sigma0'],
                    help='Parallelization strategy')
 
@@ -283,13 +283,13 @@ def parse_args():
                    help='Monte Carlo repetitions per config')
     p.add_argument('--isis', type=int, nargs='+', default=DEFAULT_ISIS,
                    help='ISI values to evaluate')
-    p.add_argument('--n-sequences', type=int, default=10,
+    p.add_argument('--n-sequences', type=int, default=100,
                    help='Number of experiment sequences')
-    p.add_argument('--seq-length', type=int, default=81,
+    p.add_argument('--seq-length', type=int, default=120,
                    help='Length of each sequence')
     p.add_argument('--min-pairs-per-isi', type=int, default=5,
                    help='Minimum repeat pairs per ISI per sequence')
-    p.add_argument('--seed', type=int, default=42,
+    p.add_argument('--seed', type=int, default=43,
                    help='Base random seed')
     p.add_argument('--metric', type=str, default='cosine',
                    help='Distance metric')
