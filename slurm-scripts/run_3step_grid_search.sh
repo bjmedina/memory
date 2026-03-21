@@ -42,11 +42,13 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 # SIGMA2_GRID="${SIGMA2_GRID:-}"
 
 OFFSET=${OFFSET:-0}
-JOB_INDEX=$(( OFFSET + SLURM_ARRAY_TASK_ID ))
+BATCH_SIZE=${BATCH_SIZE:-150}
+JOB_INDEX=$(( OFFSET * BATCH_SIZE + SLURM_ARRAY_TASK_ID ))
 
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
 echo "OFFSET              = $OFFSET"
+echo "BATCH_SIZE          = $BATCH_SIZE"
 echo "JOB_INDEX           = $JOB_INDEX"
 echo "======================================="
 
