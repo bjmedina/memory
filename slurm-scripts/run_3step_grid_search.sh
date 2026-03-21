@@ -22,15 +22,33 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 # GLOBAL_BASE / OFFSET / CHUNK_SIZE: set by submit_3step_grid_search_in_chunks.sh via sbatch --export=...
 # Fallback (manual run): OFFSET=0 → JOB_INDEX = SLURM_ARRAY_TASK_ID
 CHUNK_SIZE=150
-OFFSET=4
-TASK_LOCAL="$SLURM_ARRAY_TASK_ID"
+BATCH_SIZE=${BATCH_SIZE:-150}
+OFFSET=${OFFSET:-0}
 
-JOB_INDEX=$(( OFFSET * CHUNK_SIZE + TASK_LOCAL ))                                                                                                                                                                              
 
 # =============================
 # CONFIGURABLE PARAMETERS
 # =============================
 
+# N_MC=${N_MC:-10}
+# ISIS="${ISIS:-0 1 2 4 8 16 32 64}"
+# PARALLEL_MODE="${PARALLEL_MODE:-sigma0}"
+# SAVE_DIR="${SAVE_DIR:-reports/figures/3step_grid_search_t5}"
+# SEED="${SEED:-43}"
+# METRIC="${METRIC:-cosine}"
+# WHICH_TASK="${WHICH_TASK:-0}"
+# ENCODER="${ENCODER:-resnet50}"
+# LAYER="${LAYER:-layer4}"
+# DEVICE="${DEVICE:-cuda}"
+# T_STEP="${T_STEP:-5}"
+# N_SEQUENCES="${N_SEQUENCES:-100}"
+# SEQ_LENGTH="${SEQ_LENGTH:-120}"
+# MIN_PAIRS="${MIN_PAIRS:-5}"
+# SIGMA0_GRID="${SIGMA0_GRID:-}"
+# SIGMA1_GRID="${SIGMA1_GRID:-}"
+# SIGMA2_GRID="${SIGMA2_GRID:-}"
+
+JOB_INDEX=$(( OFFSET * BATCH_SIZE + SLURM_ARRAY_TASK_ID ))
 PARALLEL_MODE="flat"
 METRIC="cosine"
 T_STEP=5

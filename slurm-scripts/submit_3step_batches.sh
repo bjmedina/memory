@@ -1,22 +1,32 @@
 #!/bin/bash
-# Submits 3-step grid search in batches, chaining with SLURM dependencies.
-# Each batch waits for the previous one to finish before starting.
+# Submits 3-step grid search in batches, waiting for each to finish before
+# submitting the next. This avoids QOSMaxSubmitJobPerUserLimit errors.
 #
 # Usage: bash slurm-scripts/submit_3step_batches.sh
 
 TOTAL_JOBS=3375
 BATCH_SIZE=150
-PREV=""
+NUM_BATCHES=$(( (TOTAL_JOBS + BATCH_SIZE - 1) / BATCH_SIZE ))
+POLL_INTERVAL=60  # seconds between squeue checks
 
-for (( OFF=0; OFF<TOTAL_JOBS; OFF+=BATCH_SIZE )); do
-    LEFT=$((TOTAL_JOBS - OFF))
+for (( BATCH=0; BATCH<NUM_BATCHES; BATCH++ )); do
+    START=$(( BATCH * BATCH_SIZE ))
+    LEFT=$((TOTAL_JOBS - START))
     MAX=$(( (LEFT < BATCH_SIZE ? LEFT : BATCH_SIZE) - 1 ))
 
-    DEP=""
-    [[ -n "$PREV" ]] && DEP="--dependency=afterany:${PREV}"
+    JOBID=$(sbatch --array="0-${MAX}" \
+            --export="ALL,OFFSET=${BATCH},BATCH_SIZE=${BATCH_SIZE}" \
+            slurm-scripts/run_3step_grid_search.sh | awk '{print $NF}')
 
-    PREV=$(sbatch --array="0-${MAX}" --export="ALL,OFFSET=${OFF}" \
-           $DEP slurm-scripts/run_3step_grid_search.sh | awk '{print $NF}')
+    echo "Batch $BATCH/$((NUM_BATCHES-1))  OFFSET=$BATCH  array=0-${MAX}  jobid=$JOBID"
 
-    echo "Batch OFFSET=$OFF array=0-${MAX} jobid=$PREV"
+    # Wait for this batch to finish before submitting next
+    if (( BATCH < NUM_BATCHES - 1 )); then
+        echo "Waiting for job $JOBID to complete..."
+        while squeue -j "$JOBID" -h 2>/dev/null | grep -q "$JOBID"; do
+            sleep "$POLL_INTERVAL"
+        done
+        echo "Job $JOBID finished."
+    fi
 done
+echo "All batches submitted."
