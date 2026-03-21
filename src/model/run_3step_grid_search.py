@@ -522,6 +522,10 @@ def _run_flat_point(args, sigma0_grid, sigma1_grid, sigma2_grid,
                     isi_values, common_kwargs):
     """Process a single (sigma0, sigma1, sigma2) config."""
     shape = (len(sigma0_grid), len(sigma1_grid), len(sigma2_grid))
+    total = shape[0] * shape[1] * shape[2]
+    if args.job_index >= total:
+        print(f'job_index={args.job_index} >= total={total}, nothing to do.')
+        return
     i_s0, i_s1, i_s2 = np.unravel_index(args.job_index, shape)
 
     s0 = sigma0_grid[i_s0]
