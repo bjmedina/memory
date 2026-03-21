@@ -18,18 +18,16 @@ conda activate /orcd/data/jhm/001/bjmedina/miniconda3/envs/asr_312_312
 cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
 # Flat index for Python:
-#   JOB_INDEX = GLOBAL_BASE + SLURM_ARRAY_TASK_ID
-# GLOBAL_BASE / OFFSET / CHUNK_SIZE: set by submit_3step_grid_search_in_chunks.sh via sbatch --export=...
+#   JOB_INDEX = OFFSET * BATCH_SIZE + SLURM_ARRAY_TASK_ID
+# OFFSET / BATCH_SIZE: set by submit_3step_batches.sh via sbatch --export=...
 # Fallback (manual run): OFFSET=0 → JOB_INDEX = SLURM_ARRAY_TASK_ID
-CHUNK_SIZE=150
+
 BATCH_SIZE=${BATCH_SIZE:-150}
 OFFSET=${OFFSET:-0}
-
 
 # =============================
 # CONFIGURABLE PARAMETERS
 # =============================
-
 # N_MC=${N_MC:-10}
 # ISIS="${ISIS:-0 1 2 4 8 16 32 64}"
 # PARALLEL_MODE="${PARALLEL_MODE:-sigma0}"
@@ -49,6 +47,7 @@ OFFSET=${OFFSET:-0}
 # SIGMA2_GRID="${SIGMA2_GRID:-}"
 
 JOB_INDEX=$(( OFFSET * BATCH_SIZE + SLURM_ARRAY_TASK_ID ))
+
 PARALLEL_MODE="flat"
 METRIC="cosine"
 T_STEP=5
@@ -58,7 +57,7 @@ SAVE_DIR="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
 echo "OFFSET              = $OFFSET"
-echo "CHUNK_SIZE          = $CHUNK_SIZE"
+echo "BATCH_SIZE          = $BATCH_SIZE"
 echo "JOB_INDEX           = $JOB_INDEX  (flat index for Python)"
 echo "T_STEP              = $T_STEP"
 echo "PARALLEL_MODE       = $PARALLEL_MODE"
@@ -76,6 +75,6 @@ python /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/run_3ste
     --t-step "$T_STEP" \
     --metric "$METRIC" \
     --save-dir "$SAVE_DIR" \
-    --n-mc "$N_MC" 
+    --n-mc "$N_MC"
 
 echo "Done: job_index=$JOB_INDEX"
