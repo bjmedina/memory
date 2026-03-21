@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH -J 3step_grid_t5
-#SBATCH -p mit_normal_gpu
-#SBATCH -t 0-1:30:00
+#SBATCH -J 3step_grid
+#SBATCH -p ou_bcs_low
+#SBATCH -t 0-0:15:00
 #SBATCH -n 1
 #SBATCH -c 1
 #SBATCH --mem=16G
 #SBATCH --gres=gpu:1
-## Array range and OFFSET are set by submit_3step_batches.sh.
-## To run standalone: sbatch --array=0-14 slurm-scripts/run_3step_grid_search.sh
+## Default array size; submit script overrides --array for the last (shorter) chunk.
+#SBATCH --array=0-149
 #SBATCH -o slurm-scripts/logs/%x_%A_%a.out
 #SBATCH -e slurm-scripts/logs/%x_%A_%a.out
 
@@ -17,10 +17,17 @@
 conda activate /orcd/data/jhm/001/bjmedina/miniconda3/envs/asr_312_312
 cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
+# Flat index for Python:
+#   JOB_INDEX = GLOBAL_BASE + SLURM_ARRAY_TASK_ID
+# GLOBAL_BASE / OFFSET / CHUNK_SIZE: set by submit_3step_grid_search_in_chunks.sh via sbatch --export=...
+# Fallback (manual run): OFFSET=0 → JOB_INDEX = SLURM_ARRAY_TASK_ID
+CHUNK_SIZE=150
+BATCH_SIZE=${BATCH_SIZE:-150}
+OFFSET=${OFFSET:-0}
+
+
 # =============================
-# CONFIGURABLE PARAMETERS (commented out — all use Python defaults now)
-# Uncomment and pass as env vars to override, e.g.:
-#   N_MC=50 sbatch slurm-scripts/run_3step_grid_search.sh
+# CONFIGURABLE PARAMETERS
 # =============================
 
 # N_MC=${N_MC:-10}
@@ -41,24 +48,34 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 # SIGMA1_GRID="${SIGMA1_GRID:-}"
 # SIGMA2_GRID="${SIGMA2_GRID:-}"
 
-OFFSET=${OFFSET:-0}
-BATCH_SIZE=${BATCH_SIZE:-150}
 JOB_INDEX=$(( OFFSET * BATCH_SIZE + SLURM_ARRAY_TASK_ID ))
+PARALLEL_MODE="flat"
+METRIC="cosine"
+T_STEP=5
+N_MC=5
+SAVE_DIR="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/3step_grid_search_metric-${METRIC}_t${T_STEP}_nmc${N_MC}"
 
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
 echo "OFFSET              = $OFFSET"
-echo "BATCH_SIZE          = $BATCH_SIZE"
-echo "JOB_INDEX           = $JOB_INDEX"
+echo "CHUNK_SIZE          = $CHUNK_SIZE"
+echo "JOB_INDEX           = $JOB_INDEX  (flat index for Python)"
+echo "T_STEP              = $T_STEP"
+echo "PARALLEL_MODE       = $PARALLEL_MODE"
+echo "METRIC              = $METRIC"
+echo "SAVE_DIR            = $SAVE_DIR"
 echo "======================================="
 
 # =============================
 # EXECUTION
 # =============================
 
-python src/model/run_3step_grid_search.py \
+python /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/run_3step_grid_search.py \
     --job-index "$JOB_INDEX" \
-    --parallel-mode flat \
-    --resume
+    --parallel-mode "$PARALLEL_MODE" \
+    --t-step "$T_STEP" \
+    --metric "$METRIC" \
+    --save-dir "$SAVE_DIR" \
+    --n-mc "$N_MC" 
 
 echo "Done: job_index=$JOB_INDEX"
