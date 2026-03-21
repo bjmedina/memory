@@ -22,8 +22,8 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 # OFFSET / BATCH_SIZE: set by submit_3step_batches.sh via sbatch --export=...
 # Fallback (manual run): OFFSET=0 → JOB_INDEX = SLURM_ARRAY_TASK_ID
 
-BATCH_SIZE=${BATCH_SIZE:-150}
 OFFSET=${OFFSET:-0}
+BATCH_SIZE=150
 
 # =============================
 # CONFIGURABLE PARAMETERS
@@ -75,6 +75,7 @@ python /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/src/model/run_3ste
     --t-step "$T_STEP" \
     --metric "$METRIC" \
     --save-dir "$SAVE_DIR" \
-    --n-mc "$N_MC"
+    --n-mc "$N_MC" \
+    --resume
 
 echo "Done: job_index=$JOB_INDEX"
