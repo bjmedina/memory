@@ -47,6 +47,7 @@ N_MC=${N_MC:-10}
 ISIS="${ISIS:-0 2 8 16}"
 PARALLEL_MODE="${PARALLEL_MODE:-flat}"
 FINE_GRID="${FINE_GRID:-true}"
+DENSE_GRID="${DENSE_GRID:-false}"
 # Distinct from non-vectorized (2d_grid_search_full / 2d_grid_search)
 SAVE_DIR="${SAVE_DIR:-reports/figures/2d_grid_search_vectorized_full}"
 SEED="${SEED:-43}"
@@ -79,14 +80,16 @@ echo "======================================="
 # EXECUTION
 # =============================
 
-# Build optional args: --fine is used unless custom grids are provided.
+# Build optional args: --dense > --fine > default; custom grids override all.
 GRID_ARGS=()
 if [[ -n "$SIGMA0_GRID" || -n "$SIGMA_GRID" || -n "$ETA_GRID" ]]; then
     [[ -n "$SIGMA0_GRID" ]] && GRID_ARGS+=(--sigma0-grid $SIGMA0_GRID)
     [[ -n "$SIGMA_GRID" ]]  && GRID_ARGS+=(--sigma-grid $SIGMA_GRID)
     [[ -n "$ETA_GRID" ]]    && GRID_ARGS+=(--eta-grid $ETA_GRID)
-else
-    [[ "$FINE_GRID" == true ]] && GRID_ARGS=(--fine)
+elif [[ "$DENSE_GRID" == true ]]; then
+    GRID_ARGS=(--dense)
+elif [[ "$FINE_GRID" == true ]]; then
+    GRID_ARGS=(--fine)
 fi
 
 python src/model/run_2d_grid_search_vectorized.py \

@@ -66,6 +66,16 @@ FINE_SIGMA0 = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.55, 0.6, 0.7, 0
 FINE_SIGMA  = [0.0, 0.0125, 0.025, 0.0375, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.25, 0.3]
 FINE_ETA    = [0.0, 0.0025, 0.005, 0.0075, 0.01, 0.015, 0.02, 0.035, 0.05, 0.075, 0.1, 0.15, 0.2]
 
+# Dense grid (~2× resolution vs fine, ~4× vs default) for --dense
+# sigma0: 29 pts (step ~0.035), sigma: 25 pts (step 0.0125), eta: 25 pts (step 0.008)
+# Total: 29 × 25 × 25 = 18,125 triples
+DENSE_SIGMA0 = sorted(set(
+    [round(x * 0.035, 4) for x in range(29)]          # 0.0, 0.035, 0.07, ..., 0.98
+    + [1.0]                                             # ensure endpoint
+))
+DENSE_SIGMA = [round(x * 0.0125, 5) for x in range(25)]  # 0.0, 0.0125, ..., 0.3
+DENSE_ETA   = [round(x * 0.008, 4) for x in range(26)]   # 0.0, 0.008, ..., 0.2
+
 
 # ── MC d-prime ────────────────────────────────────────────────────────
 
@@ -260,6 +270,8 @@ def parse_args():
     # Grid parameters
     p.add_argument('--fine', action='store_true',
                    help='Use finer grid (~2× resolution per dimension; more triples)')
+    p.add_argument('--dense', action='store_true',
+                   help='Use dense grid (~4× resolution vs default; ~19,500 triples)')
     p.add_argument('--sigma0-grid', type=float, nargs='+', default=None,
                    help='Sigma0 (encoding noise) grid values (default: from --fine or coarse grid)')
     p.add_argument('--sigma-grid', type=float, nargs='+', default=None,
@@ -301,18 +313,18 @@ def main():
         return
 
     # ── grids ─────────────────────────────────────────────────────────
-    if args.sigma0_grid is not None:
-        sigma0_grid = np.array(args.sigma0_grid)
-    else:
-        sigma0_grid = np.array(FINE_SIGMA0 if args.fine else DEFAULT_SIGMA0)
-    if args.sigma_grid is not None:
-        sigma_grid = np.array(args.sigma_grid)
-    else:
-        sigma_grid = np.array(FINE_SIGMA if args.fine else DEFAULT_SIGMA)
-    if args.eta_grid is not None:
-        eta_grid = np.array(args.eta_grid)
-    else:
-        eta_grid = np.array(FINE_ETA if args.fine else DEFAULT_ETA)
+    def _pick_grid(custom, dense, fine, default):
+        if custom is not None:
+            return np.array(custom)
+        if args.dense:
+            return np.array(dense)
+        if args.fine:
+            return np.array(fine)
+        return np.array(default)
+
+    sigma0_grid = _pick_grid(args.sigma0_grid, DENSE_SIGMA0, FINE_SIGMA0, DEFAULT_SIGMA0)
+    sigma_grid  = _pick_grid(args.sigma_grid,  DENSE_SIGMA,  FINE_SIGMA,  DEFAULT_SIGMA)
+    eta_grid    = _pick_grid(args.eta_grid,    DENSE_ETA,    FINE_ETA,    DEFAULT_ETA)
     isi_values = tuple(args.isis)
 
     # ── validate job index ────────────────────────────────────────────
