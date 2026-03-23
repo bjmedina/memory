@@ -8,7 +8,7 @@
 ## Flat mode: one job per (sigma0, sigma, eta) triple.
 ## Fine grid: 15 x 13 x 13 = 2535 triples → array 0-2534.
 ## %500 throttle limits concurrent jobs to avoid overwhelming the scheduler.
-#SBATCH --array=0-2534%500
+#SBATCH --array=0-149
 #SBATCH -o slurm-scripts/logs/%x_%A_%a.out
 #SBATCH -e slurm-scripts/logs/%x_%A_%a.err
 
@@ -43,24 +43,20 @@ cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 #   SLURM_ARRAY_TASK_ID=0 bash slurm-scripts/run_2d_grid_search_vectorized.sh
 # =============================
 
-N_MC=${N_MC:-10}
-ISIS="${ISIS:-0 2 8 16}"
-PARALLEL_MODE="${PARALLEL_MODE:-flat}"
-FINE_GRID="${FINE_GRID:-true}"
-DENSE_GRID="${DENSE_GRID:-false}"
+ISIS="0 1 2 4 8 16 32 64"
+N_MC=5
+PARALLEL_MODE="flat"
+FINE_GRID="true"
+DENSE_GRID="false"
 # Distinct from non-vectorized (2d_grid_search_full / 2d_grid_search)
-SAVE_DIR="${SAVE_DIR:-reports/figures/2d_grid_search_vectorized_full}"
-SEED="${SEED:-43}"
-METRIC="${METRIC:-euclidean}"
-N_SEQUENCES="${N_SEQUENCES:-100}"
-SEQ_LENGTH="${SEQ_LENGTH:-99}"
-MIN_PAIRS="${MIN_PAIRS:-5}"
+SAVE_DIR="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/2d_grid_search_vectorized_all_isis"
+SEED=44
+METRIC="euclidean"
+N_SEQUENCES=30
+SEQ_LENGTH=120
+MIN_PAIRS="5"
 
-# Custom grids (optional; override --fine when set).
-# Pass as space-separated floats, e.g.: SIGMA0_GRID="0.0 0.25 0.5 0.75 1.0"
-SIGMA0_GRID="${SIGMA0_GRID:-}"
-SIGMA_GRID="${SIGMA_GRID:-}"
-ETA_GRID="${ETA_GRID:-}"
+
 
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
@@ -71,31 +67,17 @@ echo "FINE_GRID          = $FINE_GRID"
 echo "METRIC             = $METRIC"
 echo "SEED               = $SEED"
 echo "SAVE_DIR           = $SAVE_DIR"
-[[ -n "$SIGMA0_GRID" ]] && echo "SIGMA0_GRID        = $SIGMA0_GRID"
-[[ -n "$SIGMA_GRID" ]]  && echo "SIGMA_GRID         = $SIGMA_GRID"
-[[ -n "$ETA_GRID" ]]    && echo "ETA_GRID           = $ETA_GRID"
 echo "======================================="
 
 # =============================
 # EXECUTION
 # =============================
 
-# Build optional args: --dense > --fine > default; custom grids override all.
-GRID_ARGS=()
-if [[ -n "$SIGMA0_GRID" || -n "$SIGMA_GRID" || -n "$ETA_GRID" ]]; then
-    [[ -n "$SIGMA0_GRID" ]] && GRID_ARGS+=(--sigma0-grid $SIGMA0_GRID)
-    [[ -n "$SIGMA_GRID" ]]  && GRID_ARGS+=(--sigma-grid $SIGMA_GRID)
-    [[ -n "$ETA_GRID" ]]    && GRID_ARGS+=(--eta-grid $ETA_GRID)
-elif [[ "$DENSE_GRID" == true ]]; then
-    GRID_ARGS=(--dense)
-elif [[ "$FINE_GRID" == true ]]; then
-    GRID_ARGS=(--fine)
-fi
 
 python src/model/run_2d_grid_search_vectorized.py \
     --job-index "$SLURM_ARRAY_TASK_ID" \
     --parallel-mode "$PARALLEL_MODE" \
-    "${GRID_ARGS[@]}" \
+    --fine \
     --n-mc "$N_MC" \
     --isis $ISIS \
     --seed "$SEED" \

@@ -20,10 +20,10 @@
 #SBATCH -o slurm-scripts/logs/%x_%j.out
 #SBATCH -e slurm-scripts/logs/%x_%j.err
 
-source activate /orcd/data/jhm/001/gelbanna/miniconda3/envs/asr_312
+conda activate /orcd/data/jhm/001/bjmedina/miniconda3/envs/asr_312_312
 cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
-SAVE_DIR="${SAVE_DIR:-reports/figures/3step_grid_search_t5}"
+SAVE_DIR="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/3step_grid_search_metric-cosine_t5_nmc5"
 
 echo "Merging results from: $SAVE_DIR"
 

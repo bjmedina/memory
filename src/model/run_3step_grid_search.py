@@ -75,14 +75,17 @@ from utls.analysis_helpers import auroc_to_dprime
 
 # ── defaults ──────────────────────────────────────────────────────────
 # Broad geomspace grids for exploratory sweep (15 values each)
-DEFAULT_SIGMA0 = [0.0] + np.geomspace(0.1, 50, 14).tolist()
-DEFAULT_SIGMA1 = [0.0] + np.geomspace(0.01, 30, 14).tolist()
-DEFAULT_SIGMA2 = [0.0] + np.geomspace(0.001, 30, 14).tolist()
+# DEFAULT_SIGMA0 = [0.0] + np.geomspace(0.1, 50, 14).tolist()
+# DEFAULT_SIGMA1 = [0.0] + np.geomspace(0.01, 30, 14).tolist()
+# DEFAULT_SIGMA2 = [0.0] + np.geomspace(0.001, 30, 14).tolist()
+DEFAULT_SIGMA0 = [0.0] + np.geomspace(0.01, 25, 14).tolist()
+DEFAULT_SIGMA1 = [0.0] + np.geomspace(0.01, 25, 14).tolist()
+DEFAULT_SIGMA2 = [0.0] + np.geomspace(0.01, 25, 14).tolist()
 DEFAULT_ISIS   = [0, 1, 2, 4, 8, 16, 32, 64]
 
 # SIGMA=0 is the no percepetual encoding noise model
 # if sigma1 == sigma2, then we have a constant noise regime
-# if sigma1 != sigma2, then we have a 3-step noise regime
+# if sigma0 > 0 and !=  sigma1 != sigma2, then we have a 3-step noise regime
 
 # ── MC d-prime ────────────────────────────────────────────────────────
 
@@ -188,8 +191,8 @@ def run_mc_dprime(sigma0, sigma1, sigma2, *,
 
 def merge_results(save_dir):
     """Merge per-slice .npz files into a single grid_search_results_3step_t5.npz."""
-    sigma0_files = sorted(glob(os.path.join(save_dir, 'grid_slice_s0idx*.npz')))
-    flat_files = sorted(glob(os.path.join(save_dir, 'grid_point_*.npz')))
+    sigma0_files = sorted(glob.glob(os.path.join(save_dir, 'grid_slice_s0idx*.npz')))
+    flat_files = sorted(glob.glob(os.path.join(save_dir, 'grid_point_*.npz')))
 
     if sigma0_files:
         print(f'Found {len(sigma0_files)} sigma0-mode slice files')
@@ -472,6 +475,10 @@ def _run_sigma0_slice(args, sigma0_grid, sigma1_grid, sigma2_grid,
 
     for i_s1, s1 in enumerate(sigma1_grid):
         for i_s2, s2 in enumerate(sigma2_grid):
+            if s2 > s1:
+                print(f'Invalid combination: s2 ({s2}) > s1 ({s1}). Exiting.')
+                sys.exit(1)
+
             triple_path = os.path.join(per_triple_dir,
                                        _triple_filename(s0, s1, s2))
 

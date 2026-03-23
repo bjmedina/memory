@@ -46,8 +46,8 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--num-batches", type=int, default=23,
                         help="Number of batches to submit (default: 23)")
-    parser.add_argument("--poll-interval", type=int, default=60,
-                        help="Seconds between squeue checks (default: 60)")
+    parser.add_argument("--poll-interval", type=int, default=30,
+                        help="Seconds between squeue checks (default: 30)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print sbatch commands without submitting")
     args = parser.parse_args()
