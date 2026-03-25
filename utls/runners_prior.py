@@ -196,7 +196,7 @@ def run_model_core_prior(
                     hit_scores.append(score_val)
                     isi = t - last_seen[incoming]
                     isi_hit_dists[isi].append((score_val, t))
-                    if return_item_scores:
+                    if return_item_scores and isi > 1:
                         item_hits[stim_name].append(score_val)
                     if return_trial_log:
                         trial_log.append({
