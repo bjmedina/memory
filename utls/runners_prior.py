@@ -74,6 +74,8 @@ def run_model_core_prior(
     metric="cosine",
     seed=0,
     torch_rng=None,
+    return_item_scores=False,
+    return_trial_log=False,
 ):
     """Prior-guided drift-diffusion memory simulation (any dimensionality).
 
@@ -106,11 +108,19 @@ def run_model_core_prior(
         Random seed.
     torch_rng : torch.Generator or None
 
+    return_item_scores : bool
+        If True, also return ``item_hits``/``item_fas`` dictionaries containing
+        per-stimulus score lists.
+    return_trial_log : bool
+        If True, return ``trial_log`` with one row per scored trial
+        (repeat/foil), including ISI and raw score.
+
     Returns
     -------
     dict
         Keys: ``hits``, ``fas``, ``isi_hit_dists``, ``fa_by_t``,
         ``T_max``, ``metric``, ``score_type``.
+        Optional keys: ``item_hits``, ``item_fas``, ``trial_log``.
     """
     if torch_rng is None:
         torch_rng = torch.Generator(device=X0.device)
@@ -126,8 +136,12 @@ def run_model_core_prior(
     isi_hit_dists = defaultdict(list)
     T_max = max((len(seq) for seq in experiment_list), default=0)
     fa_by_t = [[] for _ in range(T_max)]
+    idx_to_name = {v: k for k, v in name_to_idx.items()}
+    item_hits = defaultdict(list)
+    item_fas = defaultdict(list)
+    trial_log = []
 
-    for seq in experiment_list:
+    for seq_i, seq in enumerate(experiment_list):
         if not seq:
             continue
 
@@ -177,13 +191,36 @@ def run_model_core_prior(
             # ---------- DECISION STEP ----------
             if score_val is not None:
                 is_repeat = incoming in seen
+                stim_name = idx_to_name[incoming]
                 if is_repeat:
                     hit_scores.append(score_val)
                     isi = t - last_seen[incoming]
                     isi_hit_dists[isi].append((score_val, t))
+                    if return_item_scores:
+                        item_hits[stim_name].append(score_val)
+                    if return_trial_log:
+                        trial_log.append({
+                            "sequence_index": seq_i,
+                            "trial_index": t,
+                            "stimulus": stim_name,
+                            "is_repeat": True,
+                            "isi": isi - 1,
+                            "score": score_val,
+                        })
                 else:
                     fa_scores.append(score_val)
                     fa_by_t[t - 1].append(score_val)
+                    if return_item_scores:
+                        item_fas[stim_name].append(score_val)
+                    if return_trial_log:
+                        trial_log.append({
+                            "sequence_index": seq_i,
+                            "trial_index": t,
+                            "stimulus": stim_name,
+                            "is_repeat": False,
+                            "isi": np.nan,
+                            "score": score_val,
+                        })
 
             # ---------- STORE NEW MEMORY ----------
             base = X0[incoming].clone()
@@ -196,7 +233,7 @@ def run_model_core_prior(
             seen.add(incoming)
             last_seen[incoming] = t
 
-    return {
+    out = {
         "hits": np.array(hit_scores),
         "fas": np.array(fa_scores),
         "isi_hit_dists": dict(isi_hit_dists),
@@ -205,3 +242,9 @@ def run_model_core_prior(
         "metric": metric,
         "score_type": "likelihood" if metric == "loglikelihood" else "distance",
     }
+    if return_item_scores:
+        out["item_hits"] = dict(item_hits)
+        out["item_fas"] = dict(item_fas)
+    if return_trial_log:
+        out["trial_log"] = trial_log
+    return out
