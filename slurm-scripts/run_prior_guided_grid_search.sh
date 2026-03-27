@@ -37,7 +37,7 @@ WHICH_TASK="${WHICH_TASK:-2}"
 ENCODER="${ENCODER:-texture_pca}"
 PC_DIMS="${PC_DIMS:-256}"
 DEVICE="${DEVICE:-cuda}"
-SAVE_DIR="${SAVE_DIR:-/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/prior_guided_grid_search_metric-${METRIC}_nmc${N_MC}_task${WHICH_TASK}}"
+SAVE_DIR="${SAVE_DIR:-/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/prior_guided_grid_search_metric-${METRIC}_task${WHICH_TASK}_nseq300_len135}"
 
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"

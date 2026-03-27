@@ -19,7 +19,7 @@
 cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 conda activate /orcd/data/jhm/001/bjmedina/miniconda3/envs/asr_312_312
 
-METRIC="${METRIC:-cosine}"
+METRIC="${METRIC:-euclidean}"
 N_MC="${N_MC:-1}"
 WHICH_TASK="${WHICH_TASK:-2}"
 SAVE_DIR="${SAVE_DIR:-/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/prior_guided_grid_search_metric-${METRIC}_nmc${N_MC}_task${WHICH_TASK}}"

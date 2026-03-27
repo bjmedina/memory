@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 from IPython.display import clear_output
 
-sys.path.append('/om2/user/jmhicks/projects/TextureStreaming/code/')
+sys.path.append('/orcd/data/jhm/001/om2/jmhicks/projects/TextureStreaming/code/')
 
 from chexture_choolbox.auditorytexture.statistics_sets import (
     STAT_SET_FULL_MCDERMOTTSIMONCELLI as statistics_dict
@@ -33,7 +33,7 @@ import importlib
 import importlib.util
 
 # ── Load audio-prior modules without conflicting with the local utils/ ──
-_audio_prior_path = '/om2/user/lakshmin/audio-prior/'
+_audio_prior_path = '/orcd/data/jhm/001/om2/lakshmin/audio-prior/'
 
 # Temporarily hide any cached 'utils' so audio-prior's utils is found
 _saved_utils = sys.modules.pop('utils', None)
@@ -61,7 +61,7 @@ class ScoreFunction():
                  likelihood_eval = True,
                  sample = False,
                  train = False,
-                 config="/om2/user/bjmedina/auditory-memory/memory/assets/bryan.yaml",
+                 config="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/assets/bryan.yaml",
                  device='cpu',
                  normalize=True):
 
@@ -89,7 +89,7 @@ class ScoreFunction():
 
         self.score_model = self.score_model.to(self.device)
         
-        self.ckpt_path = "/om2/user/lakshmin/audio-prior/" + self.cfg.model.ckpt_path.format(self.cfg.data.n_pcs, self.mode)
+        self.ckpt_path = "/orcd/data/jhm/001/om2/lakshmin/audio-prior/" + self.cfg.model.ckpt_path.format(self.cfg.data.n_pcs, self.mode)
         if 'SLURM_RESTART_COUNT' in os.environ.keys() or self.restart:
             self.score_model.load_state_dict(torch.load(self.ckpt_path))
 

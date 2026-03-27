@@ -295,13 +295,13 @@ def parse_args():
                    help='Age threshold for switching sigma1 -> sigma2')
 
     # Experiment parameters
-    p.add_argument('--n-mc', type=int, default=10,
+    p.add_argument('--n-mc', type=int, default=1,
                    help='Monte Carlo repetitions per config')
     p.add_argument('--isis', type=int, nargs='+', default=DEFAULT_ISIS,
                    help='ISI values to evaluate')
-    p.add_argument('--n-sequences', type=int, default=30,
+    p.add_argument('--n-sequences', type=int, default=300,
                    help='Number of experiment sequences')
-    p.add_argument('--seq-length', type=int, default=120,
+    p.add_argument('--seq-length', type=int, default=135,
                    help='Length of each sequence')
     p.add_argument('--min-pairs-per-isi', type=int, default=4,
                    help='Minimum repeat pairs per ISI per sequence')

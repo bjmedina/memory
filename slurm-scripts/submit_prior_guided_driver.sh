@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J prior_driver
-#SBATCH -p ou_bcs_low
-#SBATCH -t 2-0:00:00
+#SBATCH -p ou_bcs_normal
+#SBATCH -t 0-24:00:00
 #SBATCH -n 1
 #SBATCH -c 1
 #SBATCH --mem=1G

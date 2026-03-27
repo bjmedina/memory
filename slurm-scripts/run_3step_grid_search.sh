@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J 3step_grid
 #SBATCH -p ou_bcs_low
-#SBATCH -t 0-0:15:00
+#SBATCH -t 0-0:30:00
 #SBATCH -n 1
 #SBATCH -c 1
 #SBATCH --mem=16G
@@ -49,10 +49,10 @@ BATCH_SIZE=150
 JOB_INDEX=$(( OFFSET * BATCH_SIZE + SLURM_ARRAY_TASK_ID ))
 
 PARALLEL_MODE="flat"
-METRIC="cosine"
+METRIC="euclidean"
 T_STEP=4
 N_MC=1
-SAVE_DIR="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/3step_grid_search_metric-${METRIC}_t${T_STEP}_nmc${N_MC}_task0"
+SAVE_DIR="/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/reports/figures/3step_grid_search_metric-${METRIC}_t${T_STEP}_nmc${N_MC}_task0_nseq300_len135"
 
 echo "======================================="
 echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"

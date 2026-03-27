@@ -81,14 +81,13 @@ from src.model.ScoreFunction import ScoreFunction
 # ── defaults ──────────────────────────────────────────────────────────
 # Grid values for (sigma0, sigma, eta)
 # sigma0: encoding noise — same range as 3-step grid search
-DEFAULT_SIGMA0 = [0.0] + np.geomspace(0.01, 25, 14).tolist()
+DEFAULT_SIGMA0 = [0.0] + np.geomspace(0.01, 25, 10).tolist()
 # sigma: diffusive noise per step — moderate range for Langevin dynamics
-DEFAULT_SIGMA  = [0.0] + np.geomspace(0.01, 10, 14).tolist()
+DEFAULT_SIGMA  = [0.0] + np.geomspace(0.01, 5.0, 10).tolist()
 # eta: drift step size — typically small
-DEFAULT_ETA    = [0.0] + np.geomspace(0.001, 1.0, 14).tolist()
+DEFAULT_ETA    = [0.0] + np.geomspace(0.001, 5.0, 10).tolist()
 
 DEFAULT_ISIS   = [0, 1, 2, 4, 8, 16, 32, 64]
-
 
 # ── MC d-prime ────────────────────────────────────────────────────────
 
@@ -182,13 +181,12 @@ def run_mc_dprime(sigma0, sigma, eta, *,
 
     return dprime_dict, triple_data
 
-
 # ── merge mode ────────────────────────────────────────────────────────
 
 def merge_results(save_dir):
     """Merge per-slice .npz files into a single grid_search_results_prior_guided.npz."""
-    sigma0_files = sorted(glob(os.path.join(save_dir, 'grid_slice_s0idx*.npz')))
-    flat_files = sorted(glob(os.path.join(save_dir, 'grid_point_*.npz')))
+    sigma0_files = sorted(glob.glob(os.path.join(save_dir, 'grid_slice_s0idx*.npz')))
+    flat_files = sorted(glob.glob(os.path.join(save_dir, 'grid_point_*.npz')))
 
     if sigma0_files:
         print(f'Found {len(sigma0_files)} sigma0-mode slice files')
@@ -287,13 +285,13 @@ def parse_args():
                    help='Eta (drift step size) grid values')
 
     # Experiment parameters
-    p.add_argument('--n-mc', type=int, default=10,
+    p.add_argument('--n-mc', type=int, default=1,
                    help='Monte Carlo repetitions per config')
     p.add_argument('--isis', type=int, nargs='+', default=DEFAULT_ISIS,
                    help='ISI values to evaluate')
-    p.add_argument('--n-sequences', type=int, default=30,
+    p.add_argument('--n-sequences', type=int, default=300,
                    help='Number of experiment sequences')
-    p.add_argument('--seq-length', type=int, default=120,
+    p.add_argument('--seq-length', type=int, default=135,
                    help='Length of each sequence')
     p.add_argument('--min-pairs-per-isi', type=int, default=4,
                    help='Minimum repeat pairs per ISI per sequence')
@@ -320,7 +318,7 @@ def parse_args():
 
     # Score model
     p.add_argument('--score-config', type=str,
-                   default='/om2/user/bjmedina/auditory-memory/memory/assets/bryan.yaml',
+                   default='/orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory/assets/bryan.yaml',
                    help='Path to score model YAML config')
     p.add_argument('--score-normalize', action='store_true', default=True,
                    help='Normalize score to unit norm')
@@ -366,37 +364,39 @@ def main():
     # ── setup: load real stimuli + encoder ──────────────────────────────
     print(f'Loading experiment data (task={args.which_task}, multi={args.is_multi}) ...')
     exp_list, all_files, name_to_idx, human_runs, task_name, hr_task_name = \
-        load_experiment_data(args.which_task, args.which_isi, args.is_multi)
+        load_experiment_data(2, args.which_isi, args.is_multi)
 
-    if args.encoder_type == 'texture_pca':
-        encoder_cfg = dict(
-            encoder_type='texture_pca',
-            model_name='texture_pca',
-            statistics_dict=statistics_set.statistics,
-            model_params=model_params,
-            pc_dims=args.pc_dims,
-            sr=20000,
-            duration=2.0,
-            rms_level=0.05,
-            device=args.device,
-        )
-    else:
-        encoder_cfg = dict(
-            encoder_type=args.encoder_type,
-            model_name=args.encoder_type,
-            task='word_speaker_audioset',
-            statistics_dict=statistics_set.statistics,
-            model_params=model_params,
-            sr=20000,
-            duration=2.0,
-            rms_level=0.05,
-            time_avg=False,
-            device=args.device,
-            layer='layer4',
-        )
+    encoder_cfg = dict(
+        encoder_type='texture_pca',
+        model_name='texture_pca',
+        statistics_dict=statistics_set.statistics,
+        model_params=model_params,
+        pc_dims=args.pc_dims,
+        sr=20000,
+        duration=2.0,
+        rms_level=0.05,
+        device=args.device,
+    )
 
-    print(f'Building encoder: {args.encoder_type} ...')
-    encoder = build_encoder(encoder_cfg)
+    pc_dims = 256
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    pc_texture_model = AudioTextureEncoderPCA(
+        statistics_dict=statistics_set.statistics,
+        pc_dims=pc_dims,
+        model_params=model_params,
+        sr=20000,
+        rms_level=0.01,
+        duration=2.0,
+        device=device
+    )
+
+    print(f'Building prior encoder...')
+
+    encoder = pc_texture_model
+
+
     print(f'Encoding {len(all_files)} stimuli ...')
     X0 = encode_stimuli(encoder, all_files)
     print(f'X0 shape: {X0.shape}  (D={X0.shape[1]})')

@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH -J 2d_grid_search_vec
-#SBATCH -p mit_normal_gpu
-#SBATCH -t 0-0:30:00
+#SBATCH -p ou_bcs_low
+#SBATCH -t 0-0:15:00
 #SBATCH -n 1
 #SBATCH -c 1
-#SBATCH --mem=4G
+#SBATCH --mem=16G
+#SBATCH --gres=gpu:1
 ## Flat mode: one job per (sigma0, sigma, eta) triple.
 ## Fine grid: 15 x 13 x 13 = 2535 triples → array 0-2534.
 ## %500 throttle limits concurrent jobs to avoid overwhelming the scheduler.
