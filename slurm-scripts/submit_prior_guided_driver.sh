@@ -20,8 +20,8 @@
 #   # Override parameters:
 #   METRIC=euclidean N_MC=5 WHICH_TASK=0 sbatch slurm-scripts/submit_prior_guided_driver.sh
 
-cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 conda activate /orcd/data/jhm/001/bjmedina/miniconda3/envs/asr_312_312
+cd /orcd/data/jhm/001/om2/bjmedina/auditory-memory/memory || exit 1
 
 # Build flags from environment
 FLAGS=""

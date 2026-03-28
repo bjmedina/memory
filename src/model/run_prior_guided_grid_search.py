@@ -80,12 +80,11 @@ from src.model.ScoreFunction import ScoreFunction
 
 # ── defaults ──────────────────────────────────────────────────────────
 # Grid values for (sigma0, sigma, eta)
-# sigma0: encoding noise — same range as 3-step grid search
-DEFAULT_SIGMA0 = [0.0] + np.geomspace(0.01, 25, 10).tolist()
+DEFAULT_SIGMA0 = [0.0] + np.linspace(0.01, 1.0, 12).tolist()
 # sigma: diffusive noise per step — moderate range for Langevin dynamics
-DEFAULT_SIGMA  = [0.0] + np.geomspace(0.01, 5.0, 10).tolist()
+DEFAULT_SIGMA  = [0.0] + np.linspace(0.01, 1.0, 12).tolist()
 # eta: drift step size — typically small
-DEFAULT_ETA    = [0.0] + np.geomspace(0.001, 5.0, 10).tolist()
+DEFAULT_ETA    = [0.0] + np.linspace(0.01, 1.0, 12).tolist()
 
 DEFAULT_ISIS   = [0, 1, 2, 4, 8, 16, 32, 64]
 

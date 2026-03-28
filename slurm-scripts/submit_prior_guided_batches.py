@@ -97,11 +97,11 @@ def main():
                         help="Override save directory (auto-generated if omitted)")
 
     # Grid sizes (for computing num_batches automatically)
-    parser.add_argument("--n-sigma0", type=int, default=15,
+    parser.add_argument("--n-sigma0", type=int, default=13,
                         help="Number of sigma0 grid values")
-    parser.add_argument("--n-sigma", type=int, default=15,
+    parser.add_argument("--n-sigma", type=int, default=13,
                         help="Number of sigma grid values")
-    parser.add_argument("--n-eta", type=int, default=15,
+    parser.add_argument("--n-eta", type=int, default=13,
                         help="Number of eta grid values")
 
     args = parser.parse_args()
