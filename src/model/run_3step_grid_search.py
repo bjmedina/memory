@@ -187,6 +187,92 @@ def run_mc_dprime(sigma0, sigma1, sigma2, *,
     return dprime_dict, triple_data
 
 
+def run_mc_itemwise(sigma0, sigma1, sigma2, *,
+                    X0, name_to_idx, experiment_list,
+                    t_step, isi_values, n_mc, seed, metric):
+    """Run MC sweep and return item-level trial scores across all reps.
+
+    Returns
+    -------
+    itemwise_data : dict
+        Contains trial-level arrays and per-item summary rates by ISI.
+        Repeat trials are indexed by their true ISI; foil trials use isi=-1.
+    """
+    noise_schedule = make_noise_schedule('three-regime', {
+        'sigma0': sigma0,
+        'sigma1': sigma1,
+        'sigma2': sigma2,
+        't_step': t_step,
+    })
+
+    trial_rows = []
+    for rep in range(n_mc):
+        run = run_model_core(
+            sigma0=sigma0,
+            X0=X0,
+            name_to_idx=name_to_idx,
+            experiment_list=experiment_list,
+            noise_schedule=noise_schedule,
+            metric=metric,
+            seed=seed * 10_000 + rep,
+            return_trial_records=True,
+        )
+        for row in run.get("trial_records", []):
+            row = dict(row)
+            row["mc_rep"] = rep
+            trial_rows.append(row)
+
+    itemwise_data = {
+        "sigma0": sigma0,
+        "sigma1": sigma1,
+        "sigma2": sigma2,
+        "t_step": t_step,
+        "n_mc": n_mc,
+        "seed": seed,
+        "metric": metric,
+        "isi_values": np.array(list(isi_values), dtype=int),
+        "trial_mc_rep": np.array([r["mc_rep"] for r in trial_rows], dtype=int),
+        "trial_sequence_index": np.array([r["sequence_index"] for r in trial_rows], dtype=int),
+        "trial_t": np.array([r["trial_t"] for r in trial_rows], dtype=int),
+        "trial_stimulus": np.array([r["stimulus"] for r in trial_rows], dtype=object),
+        "trial_repeat_type": np.array([r["repeat_type"] for r in trial_rows], dtype=object),
+        "trial_isi": np.array([r["isi"] for r in trial_rows], dtype=int),
+        "trial_score": np.array([r["score"] for r in trial_rows], dtype=float),
+    }
+
+    unique_isis = [-1] + list(isi_values)
+    for isi in unique_isis:
+        if isi == -1:
+            mask = itemwise_data["trial_repeat_type"] == "foil"
+            suffix = "foil"
+        else:
+            mask = (
+                (itemwise_data["trial_repeat_type"] == "repeat")
+                & (itemwise_data["trial_isi"] == int(isi))
+            )
+            suffix = f"isi{int(isi)}"
+
+        stims = itemwise_data["trial_stimulus"][mask]
+        scores = itemwise_data["trial_score"][mask]
+        by_item = defaultdict(list)
+        for stim, score in zip(stims, scores):
+            by_item[stim].append(float(score))
+
+        itemwise_data[f"item_names_{suffix}"] = np.array(sorted(by_item.keys()), dtype=object)
+        itemwise_data[f"item_score_lists_{suffix}"] = np.array(
+            [np.array(by_item[k], dtype=float) for k in sorted(by_item.keys())],
+            dtype=object,
+        )
+        itemwise_data[f"item_score_mean_{suffix}"] = np.array(
+            [np.mean(by_item[k]) for k in sorted(by_item.keys())], dtype=float
+        ) if len(by_item) > 0 else np.array([], dtype=float)
+        itemwise_data[f"item_n_trials_{suffix}"] = np.array(
+            [len(by_item[k]) for k in sorted(by_item.keys())], dtype=int
+        ) if len(by_item) > 0 else np.array([], dtype=int)
+
+    return itemwise_data
+
+
 # ── merge mode ────────────────────────────────────────────────────────
 
 def merge_results(save_dir):
