@@ -187,6 +187,83 @@ def run_mc_dprime(sigma0, sigma1, sigma2, *,
     return dprime_dict, triple_data
 
 
+def run_mc_dprime_itemwise(sigma0, sigma1, sigma2, *,
+                           X0, name_to_idx, experiment_list,
+                           t_step, isi_values, n_mc, seed, metric):
+    """Run MC sweep and return per-item, per-ISI scores.
+
+    Like run_mc_dprime but preserves stimulus identity so that each
+    sound's score can be examined individually.
+
+    Returns
+    -------
+    item_isi_hits : dict
+        {basename: {isi: [scores]}} — per-item hit scores keyed by ISI.
+    item_fa_scores : dict
+        {basename: [scores]} — per-item false-alarm scores.
+    dprime_dict : dict
+        {isi: d'} — same aggregate d' as run_mc_dprime (for convenience).
+    """
+    runner_isi_values = [isi + 1 for isi in isi_values]
+    score_type = 'distance' if metric != 'loglikelihood' else 'likelihood'
+
+    noise_schedule = make_noise_schedule('three-regime', {
+        'sigma0': sigma0,
+        'sigma1': sigma1,
+        'sigma2': sigma2,
+        't_step': t_step,
+    })
+
+    # accumulators keyed by basename for easy matching with human yt_id
+    all_item_isi_hits = defaultdict(lambda: defaultdict(list))
+    all_item_fa_scores = defaultdict(list)
+    all_isi_hits = defaultdict(list)
+    all_fas = []
+
+    for rep in range(n_mc):
+        run = run_model_core(
+            sigma0=sigma0,
+            X0=X0, name_to_idx=name_to_idx,
+            experiment_list=experiment_list,
+            noise_schedule=noise_schedule,
+            metric=metric,
+            seed=seed * 10_000 + rep,
+        )
+
+        # aggregate trialwise d' data (same as run_mc_dprime)
+        for risi in runner_isi_values:
+            all_isi_hits[risi].extend(run['isi_hit_dists'].get(risi, []))
+        all_fas.extend(run['fas'])
+
+        # aggregate itemwise data
+        for fname, isi_dict in run['item_isi_hits'].items():
+            bname = os.path.basename(fname)
+            for isi, scores in isi_dict.items():
+                all_item_isi_hits[bname][isi].extend(scores)
+
+        for fname, scores in run['item_fa_scores'].items():
+            bname = os.path.basename(fname)
+            all_item_fa_scores[bname].extend(scores)
+
+    # compute aggregate d' (same logic as run_mc_dprime)
+    fas_arr = np.array(all_fas, dtype=float)
+    dprime_dict = {}
+    for exp_isi, risi in zip(isi_values, runner_isi_values):
+        hits_raw = all_isi_hits.get(risi, [])
+        if len(hits_raw) < 3:
+            dprime_dict[exp_isi] = np.nan
+            continue
+        hits_scores = np.array([s for s, t in hits_raw], dtype=float)
+        roc = roc_from_arrays(hits_scores, fas_arr, score_type=score_type)
+        if roc is not None:
+            _, _, auc_val = roc
+            dprime_dict[exp_isi] = auroc_to_dprime(auc_val)
+        else:
+            dprime_dict[exp_isi] = np.nan
+
+    return dict(all_item_isi_hits), dict(all_item_fa_scores), dprime_dict
+
+
 # ── merge mode ────────────────────────────────────────────────────────
 
 def merge_results(save_dir):
