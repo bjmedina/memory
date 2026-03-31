@@ -234,6 +234,7 @@ def run_model_core(
     noise_schedule=None,
     return_item_scores=False,
     return_binary_matrix=False,
+    return_trial_records=False,
     decision_threshold=None,
     debug=False,
     torch_rng=None,
@@ -249,6 +250,8 @@ def run_model_core(
             → returns item_hits, item_fas score lists
       - return_binary_matrix=True
             → returns DataFrames with yes/no per item
+      - return_trial_records=True
+            → includes trial-level metadata + scores in out["trial_records"]
     """
     # ---- convenience maps ----
 
@@ -280,13 +283,14 @@ def run_model_core(
     item_isi_hits = defaultdict(lambda: defaultdict(list))  # {fname: {isi: [scores]}}
     item_fa_scores = defaultdict(list)                       # {fname: [scores]}
     binary_hits, binary_fas = [], []
+    trial_records = []
 
     stds_over_time = []
 
     # for binary mode: list of filenames for columns
     all_fnames = sorted(name_to_idx.keys())
 
-    for seq in experiment_list:
+    for seq_idx_global, seq in enumerate(experiment_list):
         if not seq:
             continue
 
@@ -356,6 +360,22 @@ def run_model_core(
                     else:
                         item_fas[fname].append(score_val)
 
+                if return_trial_records:
+                    if is_repeat:
+                        isi = t - last_seen[incoming]
+                        repeat_flag = 'repeat'
+                    else:
+                        isi = -1
+                        repeat_flag = 'foil'
+                    trial_records.append({
+                        "sequence_index": seq_idx_global,
+                        "trial_t": t,
+                        "stimulus": fname,
+                        "repeat_type": repeat_flag,
+                        "isi": isi,
+                        "score": float(score_val),
+                    })
+
                 # BINARY MATRIX MODE
                 if return_binary_matrix:
                     if decision_threshold is not None:
@@ -413,6 +433,9 @@ def run_model_core(
             "hits": pd.DataFrame(binary_hits),
             "fas": pd.DataFrame(binary_fas),
         })
+
+    if return_trial_records:
+        out["trial_records"] = trial_records
 
     return out
 
