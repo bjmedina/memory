@@ -7,11 +7,13 @@ work in **any** dimensionality.  Drop-in compatible with:
   * ``ScoreAdapter2D``  (2D analytic GMM sandbox)
   * ``ScoreFunction``   (learned 256-PC score on real auditory textures)
 
-The model has three free parameters:
+The model has three free parameters (four with a noise schedule):
 
   * σ₀  — encoding noise (applied once at memory insertion)
   * σ   — diffusive noise (constant per-step Langevin noise)
   * η   — prior-driven drift step size
+  * noise_schedule — optional callable mapping memory age → σ(age),
+    replacing the constant σ with a decaying schedule
 
 This module is the single source of truth for prior-guided simulations,
 regardless of stimulus dimensionality.
@@ -71,6 +73,7 @@ def run_model_core_prior(
     experiment_list,
     score_model,
     drift_step_size=0.0,
+    noise_schedule=None,
     metric="cosine",
     seed=0,
     torch_rng=None,
@@ -102,6 +105,11 @@ def run_model_core_prior(
         Works with both ``ScoreAdapter2D`` and ``ScoreFunction``.
     drift_step_size : float
         Magnitude of prior-driven drift per trial (η in the paper).
+    noise_schedule : callable or None
+        If provided, a callable mapping memory age (int or Tensor of ints)
+        to per-step noise σ(age).  Overrides the constant ``sigma`` for
+        diffusive noise.  See ``utls.noise_schedules`` for implementations.
+        When None (default), constant ``sigma`` is used (standard M2).
     metric : str
         Distance metric for decision.
     seed : int
@@ -150,6 +158,7 @@ def run_model_core_prior(
 
         # Pre-allocated memory bank: [seq_len, D]
         mu_bank = torch.zeros(seq_len, D, device=X0.device, dtype=X0.dtype)
+        insertion_times = torch.zeros(seq_len, device=X0.device, dtype=torch.long)
         n_mem = 0
         seen, last_seen = set(), {}
 
@@ -164,7 +173,14 @@ def run_model_core_prior(
                     device=X0.device, dtype=X0.dtype,
                     generator=torch_rng,
                 )
-                mu_bank[:n_mem] += noise * (sigma * scaled_std)
+                if noise_schedule is not None:
+                    ages = t - insertion_times[:n_mem]          # [n_mem]
+                    sigmas = noise_schedule(ages)               # [n_mem] tensor
+                    if not isinstance(sigmas, torch.Tensor):
+                        sigmas = torch.tensor(sigmas, device=X0.device, dtype=X0.dtype)
+                    mu_bank[:n_mem] += noise * (sigmas[:, None] * scaled_std[None, :])
+                else:
+                    mu_bank[:n_mem] += noise * (sigma * scaled_std)
 
                 # prior-driven drift (batched)
                 if drift_step_size > 0:
@@ -229,6 +245,7 @@ def run_model_core_prior(
                 generator=torch_rng,
             )
             mu_bank[n_mem] = base + noise_enc * (sigma0 * dim_std)
+            insertion_times[n_mem] = t
             n_mem += 1
             seen.add(incoming)
             last_seen[incoming] = t
