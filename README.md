@@ -131,20 +131,9 @@ The minimum distance across the memory bank serves as the decision variable. Sco
 
 ### Additional Model Variants
 
-Beyond the two primary models, the codebase includes several alternative formulations explored during development:
+The `ApproximatePosteriorModel` provides an alternative recognition mechanism based on log-likelihood under a Gaussian memory distribution, rather than minimum distance. It remains in the active codebase as a comparison model.
 
-| Model | Class | Description |
-|-------|-------|-------------|
-| **M1: Three-step noise** | `run_model_core` + `ThreeRegimeNoise` | Age-dependent noise schedule, no drift. Primary noise-only baseline. |
-| **M2: Prior-guided drift** | `run_model_core_prior` + `ScoreFunction` | Langevin dynamics with learned prior. Primary drift model. |
-| **Distance-based (OOP)** | `DistanceMemoryModel` | Object-oriented noise-only model for single-experiment runs. |
-| **Prior-guided (OOP)** | `DistanceMemoryPriorModel` | Object-oriented prior-guided model with animation/visualization support. |
-| **Likelihood-based** | `ApproximatePosteriorModel` | Recognition via log-likelihood under a Gaussian memory distribution. |
-| **Power-law noise** | `DistanceMemoryPowerLawModel` | Noise variance decays as a power law of trace age. |
-| **Scheduled noise** | `DistanceMemoryModelScheduledNoise` | Noise variance follows a configurable schedule. |
-| **Mixture model** | `MixtureMemoryModel` / `NoisyAgeMixtureMemoryModel` | Mixture of Gaussians over memory traces with age-dependent noise. |
-
-The functional simulation engines (`run_model_core`, `run_model_core_prior`) are preferred for grid searches and large-scale analyses. The OOP model classes (`DistanceMemoryModel`, `DistanceMemoryPriorModel`) provide richer introspection (trial-by-trial snapshots, memory bank animation) and are useful for single-experiment exploration and debugging.
+Several other model classes were explored during development (distance-based OOP models, mixture models, power-law noise variants) but are no longer part of the active pipeline. These are documented in the [File Activity Audit](#file-activity-audit) under **Legacy**.
 
 ---
 
@@ -153,32 +142,24 @@ The functional simulation engines (`run_model_core`, `run_model_core_prior`) are
 ```
 memory/
 ├── src/model/                        # Core model implementations
-│   ├── DistanceMemoryModel.py        # M1: noise-only baseline
-│   ├── DistanceMemoryPriorModel.py   # M2: prior-guided drift-diffusion
-│   ├── ScoreFunction.py              # Wrapper for the learned score network
-│   ├── analytic_gmm_2d.py            # Analytic 2D GMM prior for sandbox
-│   ├── score_adapter_2d.py           # ScoreFunction-compatible 2D wrapper
-│   ├── ApproximatePosteriorModel.py  # Likelihood-based recognition
-│   ├── DistanceMemoryPowerLawModel.py
-│   ├── DistanceMemoryModelScheduledNoise.py
-│   ├── MixtureMemoryModel.py
-│   ├── NoisyAgeMixtureMemoryModel.py
+│   ├── ScoreFunction.py              # Learned score function wrapper (prior ∇ log π)
+│   ├── run_3step_grid_search.py      # M1: Three-step noise 3D grid search (σ₀, σ₁, σ₂)
 │   ├── run_prior_guided_grid_search.py    # M2: Prior-guided 3D grid search (σ₀, σ, η)
 │   ├── run_prior_guided_refined_pipeline.py
-│   ├── run_3step_grid_search.py           # M1: Three-step noise 3D grid search (σ₀, σ₁, σ₂)
 │   ├── run_2d_grid_search.py              # 2D sandbox grid search
 │   ├── run_2d_grid_search_vectorized.py   # Vectorized 2D grid search
-│   ├── main.py ... main_v6.py             # Entry points (versioned)
-│   └── optimize_*.py                      # Fitting/optimization scripts
+│   ├── analytic_gmm_2d.py            # Analytic 2D GMM prior for sandbox
+│   ├── score_adapter_2d.py           # ScoreFunction-compatible 2D wrapper
+│   └── ApproximatePosteriorModel.py  # Likelihood-based recognition variant
 │
 ├── utls/                             # Utilities (simulation, analysis, plotting)
 │   ├── runners_v2.py                 # M1 simulation engine (run_model_core) + noise schedules
 │   ├── runners_prior.py              # M2 simulation engine (run_model_core_prior)
 │   ├── runners_2d.py                 # 2D sandbox simulation engine
 │   ├── runners_utils.py              # Data loading, encoder building, experiment orchestration
-│   ├── sigma_fitting.py              # Sequential parameter fitting (3-stage)
-│   ├── sigma_fitting_2d.py           # 2D sandbox parameter sweeps
 │   ├── encoders.py                   # AudioTextureEncoder, PCA, DNN embeddings
+│   ├── sigma_fitting.py              # Sequential parameter fitting (3-stage, M1)
+│   ├── sigma_fitting_2d.py           # 2D sandbox parameter sweeps
 │   ├── analysis_helpers.py           # d', ROC, cross-noise orchestration
 │   ├── roc_utils.py                  # ROC curve and AUROC computation
 │   ├── toy_experiments.py            # Sequence generation for parameter isolation
@@ -192,16 +173,9 @@ memory/
 │   ├── train_prior_textures.py       # Prior training on texture statistics
 │   └── prior_utls/                   # Prior-specific helpers (audio, normalization, projection)
 │
-├── utils/                            # General-purpose utilities
+├── utils/                            # General-purpose utilities (some imported transitively)
 │   ├── sequence_utils.py             # ISISequence + StimulusManager for experiment design
-│   ├── audio_utils.py                # Audio I/O and preprocessing
-│   ├── cochleagram_utils.py          # Cochleagram computation
-│   ├── distance_metrics.py           # Distance/similarity metrics
-│   ├── dprime.py                     # d' computation utilities
-│   ├── loading.py                    # Results loading with exclusion criteria
-│   ├── reliability.py                # Split-half reliability analysis
-│   ├── plot_utils.py / plotting.py   # Visualization helpers
-│   └── pair_selection_utils.py       # Stimulus pair selection
+│   └── loading.py                    # Results loading with exclusion criteria
 │
 ├── notebooks/                        # Jupyter notebooks (chronological development log)
 │   ├── human_analysis/               # Human behavioral data analyses
@@ -218,9 +192,9 @@ memory/
 │   ├── submit_prior_guided_batches.py    # M2 batched submission
 │   ├── submit_prior_guided_driver.sh
 │   ├── gather_prior_guided_grid_search.sh
-│   ├── run_2d_grid_search*.sh
-│   ├── gen_model_yamls*.py               # YAML config generators
-│   └── ...
+│   ├── run_2d_grid_search_vectorized.sh  # 2D sandbox SLURM
+│   ├── submit_2d_vec_batches.py
+│   └── submit_2d_vec_driver.sh
 │
 ├── scripts/                          # Standalone scripts
 │   ├── run_2d_grid_search.py
@@ -229,10 +203,8 @@ memory/
 ├── tests/                            # Validation tests
 │   └── test_2d_sandbox.py            # 6 tests for 2D sandbox correctness
 │
-├── reports/                          # Analysis summaries
-│   └── 2d_guided_drift_summary.md
-│
-└── make_stability_notebooks.py       # Notebook generation for stability analyses
+└── reports/                          # Analysis summaries
+    └── 2d_guided_drift_summary.md
 ```
 
 ### File Activity Audit
