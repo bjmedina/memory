@@ -208,6 +208,7 @@ def run_model_core_2d_vec(
     experiment_list,
     score_model,
     drift_step_size=0.0,
+    noise_schedule=None,
     metric="cosine",
     debug=False,
     torch_rng=None,
@@ -218,6 +219,12 @@ def run_model_core_2d_vec(
     Drop-in replacement for :func:`run_model_core_2d` with identical
     outputs.  Replaces the per-memory Python loops with batched tensor
     operations for noise, drift, and scoring.
+
+    Parameters
+    ----------
+    noise_schedule : callable or None
+        If provided, maps memory age (int or Tensor) → σ(age), overriding
+        the constant ``sigma``.  See ``utls.noise_schedules``.
     """
     if torch_rng is None:
         torch_rng = torch.Generator(device=X0.device)
@@ -243,6 +250,7 @@ def run_model_core_2d_vec(
 
         # Pre-allocated memory bank: [seq_len, D]
         mu_bank = torch.zeros(seq_len, D, device=X0.device, dtype=X0.dtype)
+        insertion_times = torch.zeros(seq_len, device=X0.device, dtype=torch.long)
         n_mem = 0
         seen, last_seen = set(), {}
 
@@ -257,7 +265,14 @@ def run_model_core_2d_vec(
                     device=X0.device, dtype=X0.dtype,
                     generator=torch_rng,
                 )
-                mu_bank[:n_mem] += noise * (sigma * scaled_std)
+                if noise_schedule is not None:
+                    ages = t - insertion_times[:n_mem]
+                    sigmas = noise_schedule(ages)
+                    if not isinstance(sigmas, torch.Tensor):
+                        sigmas = torch.tensor(sigmas, device=X0.device, dtype=X0.dtype)
+                    mu_bank[:n_mem] += noise * (sigmas[:, None] * scaled_std[None, :])
+                else:
+                    mu_bank[:n_mem] += noise * (sigma * scaled_std)
 
                 # prior-driven drift (batched)
                 if drift_step_size > 0:
@@ -294,6 +309,7 @@ def run_model_core_2d_vec(
                 generator=torch_rng,
             )
             mu_bank[n_mem] = base + noise_enc * (sigma0 * dim_std)
+            insertion_times[n_mem] = t
             n_mem += 1
             seen.add(incoming)
             last_seen[incoming] = t

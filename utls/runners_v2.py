@@ -234,6 +234,7 @@ def run_model_core(
     noise_schedule=None,
     return_item_scores=False,
     return_binary_matrix=False,
+    return_trial_records=False,
     decision_threshold=None,
     debug=False,
     torch_rng=None,
@@ -249,6 +250,8 @@ def run_model_core(
             → returns item_hits, item_fas score lists
       - return_binary_matrix=True
             → returns DataFrames with yes/no per item
+      - return_trial_records=True
+            → includes trial-level metadata + scores in out["trial_records"]
     """
     # ---- convenience maps ----
 
@@ -277,14 +280,17 @@ def run_model_core(
     fa_by_t = [[] for _ in range(T_max)]
     
     item_hits, item_fas = defaultdict(list), defaultdict(list)
+    item_isi_hits = defaultdict(lambda: defaultdict(list))  # {fname: {isi: [scores]}}
+    item_fa_scores = defaultdict(list)                       # {fname: [scores]}
     binary_hits, binary_fas = [], []
+    trial_records = []
 
     stds_over_time = []
 
     # for binary mode: list of filenames for columns
     all_fnames = sorted(name_to_idx.keys())
 
-    for seq in experiment_list:
+    for seq_idx_global, seq in enumerate(experiment_list):
         if not seq:
             continue
 
@@ -338,9 +344,11 @@ def run_model_core(
                         hit_scores.append(score_val)
                         isi = t - last_seen[incoming]
                         isi_hit_dists[isi].append((score_val, t))
+                        item_isi_hits[fname][isi].append(score_val)
                     else:
                         fa_scores.append(score_val)
                         fa_by_t[t - 1].append(score_val)
+                        item_fa_scores[fname].append(score_val)
 
                 # ITEMWISE SCORE MODE
                 if return_item_scores and not return_binary_matrix:
@@ -351,6 +359,22 @@ def run_model_core(
                             item_hits[fname].append(score_val)
                     else:
                         item_fas[fname].append(score_val)
+
+                if return_trial_records:
+                    if is_repeat:
+                        isi = t - last_seen[incoming]
+                        repeat_flag = 'repeat'
+                    else:
+                        isi = -1
+                        repeat_flag = 'foil'
+                    trial_records.append({
+                        "sequence_index": seq_idx_global,
+                        "trial_t": t,
+                        "stimulus": fname,
+                        "repeat_type": repeat_flag,
+                        "isi": isi,
+                        "score": float(score_val),
+                    })
 
                 # BINARY MATRIX MODE
                 if return_binary_matrix:
@@ -400,6 +424,8 @@ def run_model_core(
             "fas": np.array(fa_scores),
             "item_hits": item_hits,
             "item_fas": item_fas,
+            "item_isi_hits": dict(item_isi_hits),
+            "item_fa_scores": dict(item_fa_scores),
         })
 
     if return_binary_matrix:
@@ -407,6 +433,9 @@ def run_model_core(
             "hits": pd.DataFrame(binary_hits),
             "fas": pd.DataFrame(binary_fas),
         })
+
+    if return_trial_records:
+        out["trial_records"] = trial_records
 
     return out
 
@@ -544,6 +573,8 @@ def run_model_core_v2(
     fa_by_t = [[] for _ in range(T_max)]
     
     item_hits, item_fas = defaultdict(list), defaultdict(list)
+    item_isi_hits = defaultdict(lambda: defaultdict(list))  # {fname: {isi: [scores]}}
+    item_fa_scores = defaultdict(list)                       # {fname: [scores]}
     binary_hits, binary_fas = [], []
 
     stds_over_time = []
@@ -605,9 +636,11 @@ def run_model_core_v2(
                         hit_scores.append(score_val)
                         isi = t - last_seen[incoming]
                         isi_hit_dists[isi].append((score_val, t))
+                        item_isi_hits[fname][isi].append(score_val)
                     else:
                         fa_scores.append(score_val)
                         fa_by_t[t - 1].append(score_val)
+                        item_fa_scores[fname].append(score_val)
 
                 # ITEMWISE SCORE MODE
                 if return_item_scores and not return_binary_matrix:
@@ -667,6 +700,8 @@ def run_model_core_v2(
             "fas": np.array(fa_scores),
             "item_hits": item_hits,
             "item_fas": item_fas,
+            "item_isi_hits": dict(item_isi_hits),
+            "item_fa_scores": dict(item_fa_scores),
         })
 
     if return_binary_matrix:
@@ -738,6 +773,8 @@ def run_model_core_v3(
     fa_by_t = [[] for _ in range(T_max)]
     
     item_hits, item_fas = defaultdict(list), defaultdict(list)
+    item_isi_hits = defaultdict(lambda: defaultdict(list))  # {fname: {isi: [scores]}}
+    item_fa_scores = defaultdict(list)                       # {fname: [scores]}
     binary_hits, binary_fas = [], []
 
     stds_over_time = []
@@ -799,9 +836,11 @@ def run_model_core_v3(
                         hit_scores.append(score_val)
                         isi = t - last_seen[incoming]
                         isi_hit_dists[isi].append((score_val, t))
+                        item_isi_hits[fname][isi].append(score_val)
                     else:
                         fa_scores.append(score_val)
                         fa_by_t[t - 1].append(score_val)
+                        item_fa_scores[fname].append(score_val)
 
                 # ITEMWISE SCORE MODE
                 if return_item_scores and not return_binary_matrix:
@@ -861,6 +900,8 @@ def run_model_core_v3(
             "fas": np.array(fa_scores),
             "item_hits": item_hits,
             "item_fas": item_fas,
+            "item_isi_hits": dict(item_isi_hits),
+            "item_fa_scores": dict(item_fa_scores),
         })
 
     if return_binary_matrix:
@@ -1018,6 +1059,8 @@ def run_model_core_v4(
             "fas": np.array(fa_scores),
             "item_hits": item_hits,
             "item_fas": item_fas,
+            "item_isi_hits": dict(item_isi_hits),
+            "item_fa_scores": dict(item_fa_scores),
         })
 
     if return_binary_matrix:
@@ -1277,6 +1320,8 @@ def run_model_core_prior(
             "fas": np.array(fa_scores),
             "item_hits": item_hits,
             "item_fas": item_fas,
+            "item_isi_hits": dict(item_isi_hits),
+            "item_fa_scores": dict(item_fa_scores),
         })
 
     if return_binary_matrix:
